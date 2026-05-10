@@ -1,0 +1,17 @@
+export const EMAIL_TEMPLATE_PROTECTED_FIELDS = [
+  "docId",
+  "updatedAt",
+  "updatedBy",
+] as const;
+
+export const EMAIL_TEMPLATE_IMPORTABLE_FIELDS: string[] = [];
+
+export const EMAIL_TEMPLATE_EXPORTABLE_FIELDS = [
+  "docId",
+  "name",
+  "subject",
+  "notes",
+  "updatedAt",
+] as const;
+
+export const EMAIL_TEMPLATE_REQUIRED_FIELDS: string[] = [];

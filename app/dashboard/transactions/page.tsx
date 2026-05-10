@@ -1,12 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTransactionStore } from "./store/useTransactionStore";
 import { useUserStore } from "@/app/dashboard/users/store/useUserStore";
 import { Transaction, PaymentMethod } from "./interface/transaction";
 import { formatDateTime } from "@/app/utils/formatting";
+import { escapeCSV, triggerCSVDownload } from "@/app/utils/csvUtils";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/app/lib/AuthContext";
+import { toast } from "sonner";
+import { TransactionService } from "./service/TransactionService";
 
 function PaymentMethodBadge({ method }: { method: PaymentMethod | null | undefined }) {
   if (!method) return <span className="text-black">—</span>;
@@ -27,19 +31,72 @@ function PaymentMethodBadge({ method }: { method: PaymentMethod | null | undefin
   );
 }
 
-type SortKey = "createdAt" | "transactionNumber" | "paymentMethod";
+type SortKey = "createdAt" | "transactionNumber";
 type SortDir = "asc" | "desc";
 
 export default function TransactionsPage() {
   const transactions = useTransactionStore((s) => s.transactions);
   const users = useUserStore((s) => s.users);
   const router = useRouter();
+  const { user } = useAuth();
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
   const [methodFilter, setMethodFilter] = useState<"All" | PaymentMethod>("All");
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [invoicing, setInvoicing] = useState(false);
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setSelected(new Set());
+  }, [search, typeFilter, methodFilter]);
+
+  function toggleSelectAll() {
+    const allIds = displayed.map((tx) => tx.docId).filter((id): id is string => !!id);
+    const allSelected = allIds.every((id) => selected.has(id));
+    if (allSelected) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(allIds));
+    }
+  }
+
+  function toggleRow(docId: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(docId)) next.delete(docId);
+      else next.add(docId);
+      return next;
+    });
+  }
+
+  async function sendInvoices() {
+    if (!user) return;
+    setInvoicing(true);
+    try {
+      const token = await user.getIdToken();
+      const ids = Array.from(selected);
+      const results = await Promise.allSettled(
+        ids.map((id) => TransactionService.sendInvoice(id, token))
+      );
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.filter((r) => r.status === "rejected").length;
+      if (succeeded > 0 && failed === 0) {
+        toast.success(`Invoice${succeeded > 1 ? "s" : ""} sent successfully.`);
+      } else if (failed > 0 && succeeded === 0) {
+        toast.error(`Failed to send invoice${failed > 1 ? "s" : ""}.`);
+      } else {
+        toast.warning(`${succeeded} sent, ${failed} failed.`);
+      }
+      setSelected(new Set());
+    } catch {
+      toast.error("An unexpected error occurred.");
+    } finally {
+      setInvoicing(false);
+    }
+  }
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -75,17 +132,23 @@ export default function TransactionsPage() {
     result = [...result].sort((a, b) => {
       let cmp = 0;
       if (sortKey === "createdAt") {
-        cmp = new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const toMs = (v: unknown) => { if (!v) return 0; if (typeof (v as any).toMillis === "function") return (v as any).toMillis(); return new Date(v as any).getTime(); };
+        cmp = toMs(a.createdAt) - toMs(b.createdAt);
       } else if (sortKey === "transactionNumber") {
         cmp = (a.transactionNumber ?? "").localeCompare(b.transactionNumber ?? "");
-      } else {
-        cmp = (a.paymentMethod ?? "").localeCompare(b.paymentMethod ?? "");
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
     return result;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactions, users, search, typeFilter, methodFilter, sortKey, sortDir]);
+
+  useEffect(() => {
+    if (!selectAllRef.current) return;
+    const checkedCount = displayed.filter((tx) => tx.docId && selected.has(tx.docId)).length;
+    selectAllRef.current.indeterminate = checkedCount > 0 && checkedCount < displayed.length;
+  });
 
   const sortIndicator = (key: SortKey) =>
     sortKey === key ? (sortDir === "asc" ? "↑" : "↓") : <span className="opacity-30">↕</span>;
@@ -96,26 +159,24 @@ export default function TransactionsPage() {
       card: "Credit Card",
       wallet: "Wallet",
     };
-    const escape = (v: string | null | undefined) => `"${(v ?? "").replace(/"/g, '""')}"`;
-    const headers = ["Transaction #", "Created At", "Payment Method", "Type", "Customer Email", "Amount", "Status", "Order ID"];
-    const rows = transactions.map((tx) => [
-      escape(tx.transactionNumber),
-      escape(formatDateTime(tx.createdAt)),
-      escape(tx.paymentMethod ? paymentLabels[tx.paymentMethod] : null),
-      escape(tx.type),
-      escape(getCustomerEmail(tx)),
-      escape(tx.amount != null ? String(tx.amount) : null),
-      escape(tx.status),
-      escape(tx.orderId),
-    ]);
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `transactions-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const headers = ["transactionNumber", "createdAt", "paymentMethod", "type", "customerId", "amount", "status", "orderId", "gst", "gstAmount", "totalAmount", "recipientEmail"];
+    const rows = displayed.map((tx) =>
+      [
+        escapeCSV(tx.transactionNumber ?? ""),
+        escapeCSV(formatDateTime(tx.createdAt)),
+        escapeCSV(tx.paymentMethod ? paymentLabels[tx.paymentMethod] : ""),
+        escapeCSV(tx.type ?? ""),
+        escapeCSV(getCustomerEmail(tx)),
+        String(tx.amount ?? ""),
+        escapeCSV(tx.status ?? ""),
+        escapeCSV(tx.orderId ?? ""),
+        String(tx.gst ?? ""),
+        String(tx.gstAmount ?? ""),
+        String(tx.totalAmount ?? ""),
+        escapeCSV(tx.recipientEmail ?? ""),
+      ].join(",")
+    );
+    triggerCSVDownload([headers.join(","), ...rows].join("\n"), `transactions-${new Date().toISOString().slice(0, 10)}.csv`);
   }
 
   return (
@@ -127,9 +188,16 @@ export default function TransactionsPage() {
             {transactions.length} transaction{transactions.length !== 1 ? "s" : ""} total
           </p>
         </div>
-        <Button  size="sm" onClick={exportToCSV}>
-          Export CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          {selected.size > 0 && (
+            <Button size="sm" variant="outline" onClick={sendInvoices} disabled={invoicing}>
+              {invoicing ? "Sending…" : `Send Invoice (${selected.size})`}
+            </Button>
+          )}
+          <Button size="sm" onClick={exportToCSV}>
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -172,6 +240,15 @@ export default function TransactionsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-background">
+              <th className="w-10 px-4 py-3">
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={displayed.length > 0 && displayed.every((tx) => !tx.docId || selected.has(tx.docId))}
+                  onChange={toggleSelectAll}
+                  className="h-4 w-4 cursor-pointer rounded border-border accent-primary"
+                />
+              </th>
               <th
                 onClick={() => toggleSort("transactionNumber")}
                 className="cursor-pointer select-none px-5 py-3 text-left font-medium text-light-grey hover:text-black"
@@ -184,20 +261,17 @@ export default function TransactionsPage() {
               >
                 Created At {sortIndicator("createdAt")}
               </th>
-              <th
-                onClick={() => toggleSort("paymentMethod")}
-                className="cursor-pointer select-none px-5 py-3 text-left font-medium text-light-grey hover:text-black"
-              >
-                Payment Method {sortIndicator("paymentMethod")}
+              <th className="px-5 py-3 text-left font-medium text-light-grey">
+                Payment Method
               </th>
               <th className="px-5 py-3 text-left font-medium text-light-grey">Type</th>
-              <th className="px-5 py-3 text-left font-medium text-light-grey">Customer Email</th>
+              <th className="px-5 py-3 text-left font-medium text-light-grey">Customer</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {displayed.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-5 py-10 text-center text-light-grey">
+                <td colSpan={6} className="px-5 py-10 text-center text-light-grey">
                   No transactions found.
                 </td>
               </tr>
@@ -208,6 +282,14 @@ export default function TransactionsPage() {
                   onClick={() => router.push(`/dashboard/transactions/${tx.docId}`)}
                   className="cursor-pointer transition-colors hover:bg-background"
                 >
+                  <td className="w-10 px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={!!tx.docId && selected.has(tx.docId)}
+                      onChange={() => tx.docId && toggleRow(tx.docId)}
+                      className="h-4 w-4 cursor-pointer rounded border-border accent-primary"
+                    />
+                  </td>
                   <td className="px-5 py-3 font-mono text-black">
                     {tx.transactionNumber ?? "—"}
                   </td>

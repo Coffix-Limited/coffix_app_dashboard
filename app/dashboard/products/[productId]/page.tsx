@@ -34,18 +34,18 @@ function MultiSelect({
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between">
-        <label className="text-xs text-light-grey">{label}</label>
+        <label className="text-xs text-black">{label}</label>
         {showSelectAll && options.length > 0 && (
           <div className="flex gap-2">
             <button type="button" onClick={() => onChange(options.map((o) => o.value))} disabled={allSelected} className="text-xs text-primary hover:underline disabled:opacity-40">Select all</button>
-            <span className="text-xs text-light-grey">·</span>
-            <button type="button" onClick={() => onChange([])} disabled={selected.length === 0} className="text-xs text-light-grey hover:text-black hover:underline disabled:opacity-40">Unselect all</button>
+            <span className="text-xs text-black">·</span>
+            <button type="button" onClick={() => onChange([])} disabled={selected.length === 0} className="text-xs text-black hover:text-black hover:underline disabled:opacity-40">Unselect all</button>
           </div>
         )}
       </div>
       <div className="max-h-36 overflow-y-auto rounded-lg border border-border bg-white p-2 space-y-1">
         {options.length === 0 ? (
-          <p className="px-1 py-1 text-xs text-light-grey">No options available.</p>
+          <p className="px-1 py-1 text-xs text-black">No options available.</p>
         ) : (
           options.map((opt) => (
             <label key={opt.value} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm text-black">
@@ -55,7 +55,7 @@ function MultiSelect({
           ))
         )}
       </div>
-      {selected.length > 0 && <p className="mt-1 text-xs text-light-grey">{selected.length} selected</p>}
+      {selected.length > 0 && <p className="mt-1 text-xs text-black">{selected.length} selected</p>}
     </div>
   );
 }
@@ -223,7 +223,7 @@ export default function ProductDetailPage() {
 
     if (!product) {
         return (
-            <div className="flex h-64 items-center justify-center text-light-grey">
+            <div className="flex h-64 items-center justify-center text-black">
                 Product not found.
             </div>
         );
@@ -236,12 +236,12 @@ export default function ProductDetailPage() {
                 <div>
                     <button
                         onClick={() => router.push("/dashboard/products")}
-                        className="mb-2 text-xs text-light-grey hover:text-black"
+                        className="mb-2 text-xs text-black hover:text-black"
                     >
                         ← Back to Products
                     </button>
                     <h1 className="text-2xl font-semibold text-black">{product.name ?? "—"}</h1>
-                    <p className="mt-1 text-sm text-light-grey">{getCategoryName(product.categoryId)}</p>
+                    <p className="mt-1 text-sm text-black">{getCategoryName(product.categoryId)}</p>
                 </div>
                 <div className="flex gap-2">
                     <button
@@ -284,7 +284,7 @@ export default function ProductDetailPage() {
                                 { label: "Order", value: product.order ?? "—" },
                             ].map(({ label, value }) => (
                                 <div key={label} className="flex items-center justify-between px-4 py-3">
-                                    <span className="text-xs text-light-grey">{label}</span>
+                                    <span className="text-xs text-black">{label}</span>
                                     <span className="text-sm font-medium text-black">{value}</span>
                                 </div>
                             ))}
@@ -294,7 +294,7 @@ export default function ProductDetailPage() {
 
                     {/* ── Status Controls ── */}
                     <div className="rounded-xl border border-border bg-white p-4 shadow-(--shadow) space-y-4">
-                        <p className="text-xs font-medium uppercase tracking-wide text-light-grey">Availability</p>
+                        <p className="text-xs font-bold uppercase tracking-wide text-black">Availability</p>
 
                         {/* Product disable — admin only */}
                         <div className="flex items-start justify-between gap-3">
@@ -363,7 +363,7 @@ export default function ProductDetailPage() {
                     </div>
 
                     {productModifierGroups.length === 0 ? (
-                        <div className="rounded-xl border border-border bg-white p-8 text-center text-sm text-light-grey shadow-(--shadow)">
+                        <div className="rounded-xl border border-border bg-white p-8 text-center text-sm text-black shadow-(--shadow)">
                             No modifier groups linked to this product.
                         </div>
                     ) : (
@@ -378,7 +378,7 @@ export default function ProductDetailPage() {
                                     className={`flex items-center justify-between px-4 py-3 ${i !== 0 ? "border-t border-border" : ""}`}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <svg className="h-4 w-4 shrink-0 cursor-grab text-light-grey active:cursor-grabbing" viewBox="0 0 16 16" fill="currentColor">
+                                        <svg className="h-4 w-4 shrink-0 cursor-grab text-black active:cursor-grabbing" viewBox="0 0 16 16" fill="currentColor">
                                             <circle cx="5.5" cy="3.5" r="1.25" />
                                             <circle cx="10.5" cy="3.5" r="1.25" />
                                             <circle cx="5.5" cy="8" r="1.25" />
@@ -420,7 +420,7 @@ export default function ProductDetailPage() {
                                 <div className="space-y-3">
                                     {(["name", "imageUrl"] as const).map((field) => (
                                         <div key={field}>
-                                            <label className="mb-1 block text-xs text-light-grey capitalize">{field}</label>
+                                            <label className="mb-1 block text-xs text-black capitalize">{field}</label>
                                             <input
                                                 className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
                                                 value={(productForm[field] as string) ?? ""}
@@ -429,9 +429,9 @@ export default function ProductDetailPage() {
                                         </div>
                                     ))}
                                     <div>
-                                        <label className="mb-1 block text-xs text-light-grey capitalize">Price</label>
+                                        <label className="mb-1 block text-xs text-black capitalize">Price</label>
                                         <div className="relative">
-                                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-light-grey">$</span>
+                                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-black">$</span>
                                             <input
                                                 type="text"
                                                 inputMode="decimal"
@@ -449,9 +449,9 @@ export default function ProductDetailPage() {
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="mb-1 block text-xs text-light-grey capitalize">Cost</label>
+                                        <label className="mb-1 block text-xs text-black capitalize">Cost</label>
                                         <div className="relative">
-                                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-light-grey">$</span>
+                                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-black">$</span>
                                             <input
                                                 type="text"
                                                 inputMode="decimal"
@@ -489,7 +489,7 @@ export default function ProductDetailPage() {
                         {dialog === "delete-product" && (
                             <>
                                 <h3 className="mb-2 text-lg font-semibold text-black">Delete Product</h3>
-                                <p className="text-sm text-light-grey">
+                                <p className="text-sm text-black">
                                     Are you sure you want to delete <strong className="text-black">{product.name}</strong>? This cannot be undone.
                                 </p>
                                 <div className="mt-5 flex justify-end gap-2">
@@ -507,7 +507,7 @@ export default function ProductDetailPage() {
                                 <h3 className="mb-4 text-lg font-semibold text-black">Add Modifier Group</h3>
                                 <div className="space-y-3">
                                     <div>
-                                        <label className="mb-1 block text-xs text-light-grey">Modifier Group</label>
+                                        <label className="mb-1 block text-xs text-black">Modifier Group</label>
                                         <select
                                             className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
                                             value={selectedGroupId}
@@ -536,7 +536,7 @@ export default function ProductDetailPage() {
                         {dialog === "remove-modifier-group" && (
                             <>
                                 <h3 className="mb-2 text-lg font-semibold text-black">Remove Modifier Group</h3>
-                                <p className="text-sm text-light-grey">Remove this modifier group from the product? The group itself will not be deleted.</p>
+                                <p className="text-sm text-black">Remove this modifier group from the product? The group itself will not be deleted.</p>
                                 <div className="mt-5 flex justify-end gap-2">
                                     <button onClick={() => setDialog(null)} className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]">Cancel</button>
                                     <button onClick={handleRemoveModifierGroup} disabled={loading} className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50">

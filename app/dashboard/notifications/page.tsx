@@ -9,6 +9,7 @@ import { useNotificationStore } from "./store/useNotificationStore";
 import { useStoreStore } from "@/app/dashboard/stores/store/useStoreStore";
 import { useAuth } from "@/app/lib/AuthContext";
 import { NotificationService } from "./service/NotificationService";
+import { escapeCSV, tsToISO, triggerCSVDownload } from "@/app/utils/csvUtils";
 import {
   NotificationCampaign,
   NotificationChannel,
@@ -737,6 +738,21 @@ export default function NotificationsPage() {
     return result;
   }, [campaigns, search, statusFilter, channelFilter, sortKey, sortDir]);
 
+  function exportToCSV() {
+    const headers = ["docId", "name", "status", "channels", "createdAt", "sentAt"];
+    const rows = displayed.map((c) =>
+      [
+        escapeCSV(c.docId ?? ""),
+        escapeCSV(c.name),
+        escapeCSV(c.status),
+        escapeCSV(c.channels.join("|")),
+        escapeCSV(tsToISO(c.createdAt)),
+        escapeCSV(c.sentAt ? tsToISO(c.sentAt) : ""),
+      ].join(",")
+    );
+    triggerCSVDownload([headers.join(","), ...rows].join("\n"), `campaigns-${new Date().toISOString().slice(0, 10)}.csv`);
+  }
+
   const [showCreate, setShowCreate] = useState(false);
   const [editTarget, setEditTarget] = useState<NotificationCampaign | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<NotificationCampaign | null>(null);
@@ -847,15 +863,24 @@ export default function NotificationsPage() {
             {campaigns.length} campaign{campaigns.length !== 1 ? "s" : ""} total
           </p>
         </div>
-        {isAdmin && (
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
+        <div className="flex gap-2">
+<button
+            onClick={exportToCSV}
+            disabled={displayed.length === 0}
+            className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-black transition-opacity hover:opacity-80 disabled:opacity-40"
           >
-            <Plus size={15} />
-            New Campaign
+            Export CSV
           </button>
-        )}
+          {isAdmin && (
+            <button
+              onClick={openCreate}
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
+            >
+              <Plus size={15} />
+              New Campaign
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

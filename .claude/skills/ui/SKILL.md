@@ -24,3 +24,9 @@ These are the client-specific UI rules that must be followed in all UI work for 
 - Set `font-family: Arial, sans-serif` as the base font
 - Do not use Geist, Inter, or any other font family
 - Apply Arial consistently across headings, body text, labels, inputs, and buttons
+
+## Accessibility / Readability
+- The client has difficulty reading low-contrast text. Never use grey, light-grey, or any muted color for text.
+- Replace `text-light-grey` with `text-black` everywhere — labels, subtitles, helper text, table headers, icons, descriptions.
+- All section/page headers must be bold (`font-bold` or `font-semibold`).
+- Do not use `opacity-*` to dim text — use full-opacity black instead.

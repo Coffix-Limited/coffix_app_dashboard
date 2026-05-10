@@ -7,6 +7,12 @@ import { useDashboardStore } from "./store/useDashboardStore";
 import { useStoreStore } from "../stores/store/useStoreStore";
 import { Product } from "./interface/product";
 import { ProductService } from "./service/ProductService";
+import {
+  PRODUCT_PROTECTED_FIELDS,
+  PRODUCT_IMPORTABLE_FIELDS,
+  PRODUCT_REQUIRED_FIELDS,
+} from "./constants/productFieldConstants";
+import { escapeCSV, parseCSVText, triggerCSVDownload } from "@/app/utils/csvUtils";
 import Image from "next/image";
 import {
   Dialog,
@@ -65,7 +71,7 @@ function MultiSelect({
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between">
-        <label className="text-xs text-light-grey">{label} *</label>
+        <label className="text-xs text-black">{label} *</label>
         {showSelectAll && options.length > 0 && (
           <div className="flex gap-2">
             <button
@@ -76,12 +82,12 @@ function MultiSelect({
             >
               Select all
             </button>
-            <span className="text-xs text-light-grey">·</span>
+            <span className="text-xs text-black">·</span>
             <button
               type="button"
               onClick={() => onChange([])}
               disabled={selected.length === 0}
-              className="text-xs text-light-grey hover:text-black hover:underline disabled:opacity-40"
+              className="text-xs text-black hover:text-black hover:underline disabled:opacity-40"
             >
               Unselect all
             </button>
@@ -90,7 +96,7 @@ function MultiSelect({
       </div>
       <div className={`max-h-36 overflow-y-auto rounded-lg border bg-white p-2 space-y-1 ${error ? "border-error" : "border-border"}`}>
         {options.length === 0 ? (
-          <p className="px-1 py-1 text-xs text-light-grey">No options available.</p>
+          <p className="px-1 py-1 text-xs text-black">No options available.</p>
         ) : (
           options.map((opt) => (
             <label key={opt.value} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm text-black ">
@@ -108,7 +114,7 @@ function MultiSelect({
       {error ? (
         <p className="mt-1 text-xs text-error">Please select at least one.</p>
       ) : selected.length > 0 ? (
-        <p className="mt-1 text-xs text-light-grey">{selected.length} selected</p>
+        <p className="mt-1 text-xs text-black">{selected.length} selected</p>
       ) : null}
     </div>
   );
@@ -145,6 +151,13 @@ export default function ProductsPage() {
   const dragIndexRef = useRef<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [orderedProducts, setOrderedProducts] = useState<Product[]>([]);
+
+  type ImportError = { row: number; field: string; reason: string };
+  type ImportPreview = { validRows: Record<string, string>[]; errors: ImportError[] } | null;
+  const [importLoading, setImportLoading] = useState(false);
+  const [importPreview, setImportPreview] = useState<ImportPreview>(null);
+  const [showImportInfo, setShowImportInfo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isDragMode = !search && selectedCategory === "All" && sortKey === "name" && sortDir === "asc";
 
@@ -276,6 +289,176 @@ export default function ProductsPage() {
     setErrors({});
   }
 
+  function exportToCSV() {
+    const headers = ["docId", "name", "price", "cost", "order", "categoryId", "modifierGroupIds", "availableToStores", "disabledStores", "imageUrl"];
+    const rows = filtered.map((p) =>
+      [
+        escapeCSV(p.docId ?? ""),
+        escapeCSV(p.name ?? ""),
+        String(p.price ?? ""),
+        String(p.cost ?? ""),
+        String(p.order ?? ""),
+        escapeCSV(p.categoryId ?? ""),
+        escapeCSV((p.modifierGroupIds ?? []).join("|")),
+        escapeCSV((p.availableToStores ?? []).join("|")),
+        escapeCSV((p.disabledStores ?? []).join("|")),
+        escapeCSV(p.imageUrl ?? ""),
+      ].join(",")
+    );
+    triggerCSVDownload([headers.join(","), ...rows].join("\n"), `products-${new Date().toISOString().slice(0, 10)}.csv`);
+  }
+
+  function handleImportCSV(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const text = ev.target?.result as string;
+        const { headers, rows } = parseCSVText(text);
+
+        const protectedInFile = headers.filter((h) =>
+          (PRODUCT_PROTECTED_FIELDS as readonly string[]).includes(h)
+        );
+        if (protectedInFile.length > 0) {
+          toast.error(`CSV contains protected columns: ${protectedInFile.join(", ")}. Remove them and re-upload.`);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+          return;
+        }
+
+        const existingProductIds = useDashboardStore.getState().products.map((p) => p.docId!);
+        const existingCategoryIds = useDashboardStore.getState().categories.map((c) => c.docId!);
+        const existingStoreIds = useStoreStore.getState().stores.map((s) => s.docId);
+        const existingModifierGroupIds = useDashboardStore.getState().modifierGroups.map((g) => g.docId!);
+        const validImportCols = new Set([...(PRODUCT_IMPORTABLE_FIELDS as readonly string[]), "docId"]);
+
+        const validRows: Record<string, string>[] = [];
+        const errors: ImportError[] = [];
+
+        rows.forEach((cols, idx) => {
+          const rowNum = idx + 2;
+          const row: Record<string, string> = {};
+          headers.forEach((h, i) => { row[h] = cols[i] ?? ""; });
+
+          headers.filter((h) => !validImportCols.has(h)).forEach((col) =>
+            errors.push({ row: rowNum, field: col, reason: `Unknown column "${col}" will be ignored` })
+          );
+
+          let hasError = false;
+
+          if (row.docId && !existingProductIds.includes(row.docId)) {
+            errors.push({ row: rowNum, field: "docId", reason: "Product not found — cannot update" });
+            hasError = true;
+          }
+
+          if (!row.docId) {
+            if (!(PRODUCT_REQUIRED_FIELDS as readonly string[]).every((f) => row[f]?.trim())) {
+              errors.push({ row: rowNum, field: "name", reason: "name is required for new products" });
+              hasError = true;
+            }
+          }
+
+          if (row.price !== undefined && row.price !== "") {
+            const v = parseFloat(row.price);
+            if (isNaN(v) || v < 0) {
+              errors.push({ row: rowNum, field: "price", reason: "Must be a valid non-negative number" });
+              hasError = true;
+            }
+          }
+
+          if (row.cost !== undefined && row.cost !== "") {
+            const v = parseFloat(row.cost);
+            if (isNaN(v) || v < 0) {
+              errors.push({ row: rowNum, field: "cost", reason: "Must be a valid non-negative number" });
+              hasError = true;
+            }
+          }
+
+          if (row.order !== undefined && row.order !== "") {
+            if (isNaN(parseInt(row.order))) {
+              errors.push({ row: rowNum, field: "order", reason: "Must be a valid integer" });
+              hasError = true;
+            }
+          }
+
+          if (row.categoryId && !existingCategoryIds.includes(row.categoryId)) {
+            errors.push({ row: rowNum, field: "categoryId", reason: `Category "${row.categoryId}" not found` });
+            hasError = true;
+          }
+
+          if (row.modifierGroupIds) {
+            const ids = row.modifierGroupIds.split("|").filter(Boolean);
+            const invalid = ids.filter((id) => !existingModifierGroupIds.includes(id));
+            if (invalid.length > 0) {
+              errors.push({ row: rowNum, field: "modifierGroupIds", reason: `Unknown modifier group IDs: ${invalid.join(", ")}` });
+              hasError = true;
+            }
+          }
+
+          if (row.availableToStores) {
+            const ids = row.availableToStores.split("|").filter(Boolean);
+            const invalid = ids.filter((id) => !existingStoreIds.includes(id));
+            if (invalid.length > 0) {
+              errors.push({ row: rowNum, field: "availableToStores", reason: `Unknown store IDs: ${invalid.join(", ")}` });
+              hasError = true;
+            }
+          }
+
+          if (row.disabledStores) {
+            const ids = row.disabledStores.split("|").filter(Boolean);
+            const invalid = ids.filter((id) => !existingStoreIds.includes(id));
+            if (invalid.length > 0) {
+              errors.push({ row: rowNum, field: "disabledStores", reason: `Unknown store IDs: ${invalid.join(", ")}` });
+              hasError = true;
+            }
+          }
+
+          if (!hasError) validRows.push(row);
+        });
+
+        setImportPreview({ validRows, errors });
+      } catch {
+        toast.error("Failed to read CSV file.");
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  async function handleConfirmImport() {
+    if (!importPreview || importPreview.validRows.length === 0) return;
+    setImportLoading(true);
+    try {
+      let count = 0;
+      for (const row of importPreview.validRows) {
+        const data: Record<string, unknown> = {};
+        if (row.name) data.name = row.name;
+        if (row.price !== undefined && row.price !== "") data.price = parseFloat(row.price);
+        if (row.cost !== undefined && row.cost !== "") data.cost = parseFloat(row.cost);
+        if (row.order !== undefined && row.order !== "") data.order = parseInt(row.order);
+        if (row.categoryId) data.categoryId = row.categoryId;
+        if (row.modifierGroupIds !== undefined) data.modifierGroupIds = row.modifierGroupIds ? row.modifierGroupIds.split("|").filter(Boolean) : [];
+        if (row.availableToStores !== undefined) data.availableToStores = row.availableToStores ? row.availableToStores.split("|").filter(Boolean) : [];
+        if (row.disabledStores !== undefined) data.disabledStores = row.disabledStores ? row.disabledStores.split("|").filter(Boolean) : [];
+        if (row.imageUrl !== undefined) data.imageUrl = row.imageUrl;
+
+        if (row.docId) {
+          await ProductService.updateProduct(row.docId, data);
+        } else {
+          await ProductService.createProduct(data as Parameters<typeof ProductService.createProduct>[0]);
+        }
+        count++;
+      }
+      toast.success(`Imported ${count} product${count !== 1 ? "s" : ""}.`);
+      setImportPreview(null);
+    } catch {
+      toast.error("Failed to import products.");
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
   async function handleCreate() {
     const newErrors: Partial<Record<keyof NewProductForm, boolean>> = {
       name: !form.name.trim(),
@@ -321,11 +504,38 @@ export default function ProductsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-black">Products</h1>
-          <p className="mt-1 text-sm text-light-grey">
+          <p className="mt-1 text-sm text-black">
             {products.length} product{products.length !== 1 ? "s" : ""} total
           </p>
         </div>
-        <Button onClick={() => setShowCreate(true)}>+ New Product</Button>
+        <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleImportCSV}
+            className="hidden"
+          />
+<Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowImportInfo(true)}
+            disabled={importLoading}
+          >
+            {importLoading ? "Importing…" : "Import CSV"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportToCSV}
+            disabled={filtered.length === 0}
+          >
+            Export CSV
+          </Button>
+          <Button
+            size="sm"
+          onClick={() => setShowCreate(true)}>+ New Product</Button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -334,7 +544,7 @@ export default function ProductsPage() {
           placeholder="Search products..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm text-black outline-none placeholder:text-light-grey focus:border-primary sm:max-w-xs"
+          className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm text-black outline-none placeholder:text-black focus:border-primary sm:max-w-xs"
         />
         <div className="flex flex-wrap gap-2">
           {categoryFilters.map((cat) => (
@@ -355,7 +565,7 @@ export default function ProductsPage() {
       {/* Bulk action toolbar */}
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 rounded-xl border border-border bg-white px-4 py-2.5 shadow-(--shadow)">
-          <span className="text-sm text-light-grey">{selectedIds.size} selected</span>
+          <span className="text-sm text-black">{selectedIds.size} selected</span>
           <div className="flex gap-2 ml-auto">
             <button
               onClick={() => handleBulkDisable(false)}
@@ -374,7 +584,7 @@ export default function ProductsPage() {
             <button
               onClick={() => setSelectedIds(new Set())}
               disabled={bulkLoading}
-              className="text-xs text-light-grey hover:text-black disabled:opacity-50"
+              className="text-xs text-black hover:text-black disabled:opacity-50"
             >
               Clear
             </button>
@@ -398,20 +608,20 @@ export default function ProductsPage() {
               </th>
               <th
                 onClick={() => toggleSort("name")}
-                className="cursor-pointer select-none px-5 py-3 text-left font-medium text-light-grey hover:text-black"
+                className="cursor-pointer select-none px-5 py-3 text-left font-medium text-black hover:text-black"
               >
                 Product {sortKey === "name" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
               </th>
-              <th className="px-5 py-3 text-left font-medium text-light-grey">Category</th>
+              <th className="px-5 py-3 text-left font-medium text-black">Category</th>
               <th
                 onClick={() => toggleSort("price")}
-                className="cursor-pointer select-none px-5 py-3 text-right font-medium text-light-grey hover:text-black"
+                className="cursor-pointer select-none px-5 py-3 text-right font-medium text-black hover:text-black"
               >
                 Price {sortKey === "price" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
               </th>
               <th
                 onClick={() => toggleSort("cost")}
-                className="cursor-pointer select-none px-5 py-3 text-right font-medium text-light-grey hover:text-black"
+                className="cursor-pointer select-none px-5 py-3 text-right font-medium text-black hover:text-black"
               >
                 Cost {sortKey === "cost" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
               </th>
@@ -421,7 +631,7 @@ export default function ProductsPage() {
           <tbody className="divide-y divide-border">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-5 py-10 text-center text-light-grey">
+                <td colSpan={7} className="px-5 py-10 text-center text-black">
                   No products found.
                 </td>
               </tr>
@@ -442,7 +652,7 @@ export default function ProductsPage() {
                     className={`group transition-colors hover:bg-background ${isDragMode ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${isSelected ? "bg-blue-50" : ""} ${isDragOver ? "border-t-2 border-primary" : ""} ${(product.availableToStores ?? []).length > 0 && (product.availableToStores ?? []).every((id) => (product.disabledStores ?? []).includes(id)) ? "opacity-50" : ""}`}
                   >
                     {isDragMode && (
-                      <td className="w-6 px-2 py-3 text-light-grey" onClick={(e) => e.stopPropagation()}>
+                      <td className="w-6 px-2 py-3 text-black" onClick={(e) => e.stopPropagation()}>
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="opacity-40">
                           <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
                           <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
@@ -484,14 +694,14 @@ export default function ProductsPage() {
                     <td className="px-5 py-3 text-right font-semibold text-primary">
                       ${(product.price ?? 0).toFixed(2)}
                     </td>
-                    <td className="px-5 py-3 text-right text-light-grey">
+                    <td className="px-5 py-3 text-right text-black">
                       ${(product.cost ?? 0).toFixed(2)}
                     </td>
                     <td className="w-10 px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <button
                         title="Duplicate product"
                         onClick={() => handleCopyProduct(product)}
-                        className="opacity-0 group-hover:opacity-100 rounded-lg p-1.5 text-light-grey transition-opacity hover:bg-[#f0f0f0] hover:text-black"
+                        className="opacity-0 group-hover:opacity-100 rounded-lg p-1.5 text-black transition-opacity hover:bg-[#f0f0f0] hover:text-black"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
@@ -517,7 +727,7 @@ export default function ProductsPage() {
           <div className="max-h-[65vh] overflow-y-auto space-y-4 pr-1">
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
-                <label className="mb-1.5 block text-xs text-light-grey">Name *</label>
+                <label className="mb-1.5 block text-xs text-black">Name *</label>
                 <input
                   className={`w-full rounded-lg border px-3 py-2 text-sm text-black outline-none focus:border-primary ${errors.name ? "border-error" : "border-border"}`}
                   placeholder="e.g. Caramel Latte"
@@ -527,7 +737,7 @@ export default function ProductsPage() {
                 {errors.name && <p className="mt-1 text-xs text-error">Name is required.</p>}
               </div>
               <div className="col-span-2">
-                <label className="mb-1.5 block text-xs text-light-grey">Image URL</label>
+                <label className="mb-1.5 block text-xs text-black">Image URL</label>
                 <input
                   className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
                   placeholder="https://..."
@@ -536,9 +746,9 @@ export default function ProductsPage() {
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs text-light-grey">Price *</label>
+                <label className="mb-1.5 block text-xs text-black">Price *</label>
                 <div className="relative">
-                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-light-grey">$</span>
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-black">$</span>
                   <input
                     type="number"
                     min={0}
@@ -552,9 +762,9 @@ export default function ProductsPage() {
                 {errors.price && <p className="mt-1 text-xs text-error">Required.</p>}
               </div>
               <div>
-                <label className="mb-1.5 block text-xs text-light-grey">Cost *</label>
+                <label className="mb-1.5 block text-xs text-black">Cost *</label>
                 <div className="relative">
-                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-light-grey">$</span>
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-black">$</span>
                   <input
                     type="number"
                     min={0}
@@ -568,7 +778,7 @@ export default function ProductsPage() {
                 {errors.cost && <p className="mt-1 text-xs text-error">Required.</p>}
               </div>
               <div>
-                <label className="mb-1.5 block text-xs text-light-grey">Order *</label>
+                <label className="mb-1.5 block text-xs text-black">Order *</label>
                 <input
                   type="number"
                   min={0}
@@ -582,7 +792,7 @@ export default function ProductsPage() {
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs text-light-grey">Category *</label>
+              <label className="mb-1.5 block text-xs text-black">Category *</label>
               <select
                 className={`w-full rounded-lg border px-3 py-2 text-sm text-black outline-none focus:border-primary ${errors.categoryId ? "border-error" : "border-border"}`}
                 value={form.categoryId}
@@ -619,6 +829,76 @@ export default function ProductsPage() {
             <Button onClick={handleCreate} disabled={loading || !form.name.trim()}>
               {loading ? "Creating…" : "Create Product"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CSV Field Guide Dialog */}
+      <Dialog open={showImportInfo} onOpenChange={setShowImportInfo}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>CSV Import Guide — Products</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2 text-sm">
+            <div className="space-y-1.5">
+              <p className="font-medium text-black">Editable fields</p>
+              <div className="flex flex-wrap gap-1.5">
+                {(["name", "price", "cost", "order", "categoryId", "modifierGroupIds", "availableToStores", "disabledStores", "imageUrl"] as const).map((f) => (
+                  <span key={f} className="rounded-md bg-background border border-border px-2 py-0.5 text-xs text-black font-mono">{f}</span>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <p className="font-medium text-black">Required fields <span className="text-xs font-normal text-light-grey">(for new rows)</span></p>
+              <div className="flex flex-wrap gap-1.5">
+                <span className="rounded-md bg-amber-50 border border-amber-300 px-2 py-0.5 text-xs text-amber-800 font-mono">name</span>
+              </div>
+            </div>
+            <p className="text-xs text-light-grey leading-relaxed">
+              Include <span className="font-mono text-black">docId</span> to update an existing product. Omit it to create a new one. Array fields <span className="font-mono text-black">modifierGroupIds</span>, <span className="font-mono text-black">availableToStores</span>, and <span className="font-mono text-black">disabledStores</span> use <span className="font-mono text-black">|</span> as separator.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImportInfo(false)}>Cancel</Button>
+            <Button onClick={() => { setShowImportInfo(false); fileInputRef.current?.click(); }}>
+              Choose File →
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Preview Dialog */}
+      <Dialog open={importPreview !== null} onOpenChange={() => setImportPreview(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Import Preview</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {importPreview && importPreview.errors.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-black">Errors</p>
+                <div className="max-h-48 overflow-y-auto rounded-lg border border-border bg-background p-3 space-y-1">
+                  {importPreview.errors.map((e, i) => (
+                    <p key={i} className="text-xs text-black">
+                      <span className="font-medium">Row {e.row}</span> — {e.field}: {e.reason}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="text-sm text-black">
+              <span className="font-medium">{importPreview?.validRows.length ?? 0}</span> row(s) will be imported.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportPreview(null)} disabled={importLoading}>
+              Cancel
+            </Button>
+            {(importPreview?.validRows.length ?? 0) > 0 && (
+              <Button onClick={handleConfirmImport} disabled={importLoading}>
+                {importLoading ? "Importing…" : `Import ${importPreview?.validRows.length} row(s)`}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

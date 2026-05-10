@@ -10,6 +10,16 @@ import { CouponService } from "./service/CouponService";
 import { Coupon } from "./interface/coupon";
 import { AppUser } from "@/app/dashboard/users/interface/user";
 import {
+  COUPON_PROTECTED_FIELDS,
+  COUPON_IMPORTABLE_FIELDS,
+} from "./constants/couponFieldConstants";
+import {
+  escapeCSV,
+  tsToISO,
+  parseCSVText,
+  triggerCSVDownload,
+} from "@/app/utils/csvUtils";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -43,19 +53,6 @@ function resolveUserEmails(userIds: string[] | undefined, users: AppUser[]): str
   return userIds.map((id) => users.find((u) => u.docId === id)?.email ?? id).join(", ");
 }
 
-function tsToISO(value: unknown): string {
-  if (!value) return "";
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  if (typeof value === "object" && value !== null && "seconds" in value) {
-    return new Date((value as { seconds: number }).seconds * 1000).toISOString().slice(0, 10);
-  }
-  return "";
-}
-
-function escapeCSV(v: string): string {
-  return `"${v.replace(/"/g, '""')}"`;
-}
-
 function IndeterminateCheckbox({
   checked,
   indeterminate,
@@ -83,11 +80,15 @@ function IndeterminateCheckbox({
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Types ─────────────────────────────────────────────────────────────────────
 
 type CouponSortKey = "amount" | "expiryDate" | "createdAt";
 type SortDir = "asc" | "desc";
 type BulkDialog = "delete" | "expiry" | "amount" | null;
+type ImportError = { row: number; field: string; reason: string };
+type ImportPreview = { validRows: Record<string, string>[]; errors: ImportError[] } | null;
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CouponsPage() {
   const coupons = useCouponStore((s) => s.coupons);
@@ -107,6 +108,8 @@ export default function CouponsPage() {
   const [bulkAmount, setBulkAmount] = useState("");
   const [bulkLoading, setBulkLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
+  const [importPreview, setImportPreview] = useState<ImportPreview>(null);
+  const [showImportInfo, setShowImportInfo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function toggleSort(key: CouponSortKey) {
@@ -225,85 +228,147 @@ export default function CouponsPage() {
 
   function exportToCSV() {
     const headers = [
-      "code", "type", "amount", "expiryDate", "storeId", "notes",
+      "docId", "code", "type", "amount", "expiryDate", "storeId", "notes",
       "usageLimit", "usageCount", "isUsed", "source", "referralId",
       "userIds", "createdAt",
     ];
-    const rows = coupons.map((c) => [
+    const rows = filtered.map((c) => [
+      escapeCSV(c.docId ?? ""),
       escapeCSV(c.code ?? ""),
       escapeCSV(c.type ?? ""),
-      c.amount ?? "",
+      String(c.amount ?? ""),
       tsToISO(c.expiryDate),
       escapeCSV(c.storeId ?? ""),
       escapeCSV(c.notes ?? ""),
-      c.usageLimit ?? "",
-      c.usageCount ?? "",
-      c.isUsed ?? "",
+      String(c.usageLimit ?? ""),
+      String(c.usageCount ?? ""),
+      String(c.isUsed ?? ""),
       escapeCSV(c.source ?? ""),
       escapeCSV(c.referralId ?? ""),
       escapeCSV((c.userIds ?? []).join("|")),
       tsToISO(c.createdAt),
     ].join(","));
     const csv = [headers.join(","), ...rows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `coupons-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerCSVDownload(csv, `coupons-${new Date().toISOString().slice(0, 10)}.csv`);
   }
 
   // ── CSV Import ──
 
-  async function handleImportCSV(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleImportCSV(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setImportLoading(true);
     const reader = new FileReader();
-    reader.onload = async (ev) => {
+    reader.onload = (ev) => {
       try {
         const text = ev.target?.result as string;
-        const lines = text.split("\n").slice(1).filter((l) => l.trim());
-        let created = 0;
-        for (const line of lines) {
-          const cols = line.match(/("(?:[^"]|"")*"|[^,]*)/g)
-            ?.map((c) => c.replace(/^"|"$/g, "").replace(/""/g, '"')) ?? [];
-          const [
-            code, type, amount, expiryDate, storeId, notes,
-            usageLimit, usageCount, isUsed, source, referralId,
-            userIdsRaw, createdAt,
-          ] = cols;
-          if (!code) continue;
-          const parsedExpiry = expiryDate ? new Date(expiryDate) : undefined;
-          const parsedCreated = createdAt ? new Date(createdAt) : undefined;
-          const couponData: Omit<Coupon, "docId"> = {
-            code,
-            type: type || undefined,
-            amount: amount ? parseFloat(amount) : undefined,
-            expiryDate: parsedExpiry && !isNaN(parsedExpiry.getTime()) ? parsedExpiry : undefined,
-            storeId: storeId || undefined,
-            notes: notes || undefined,
-            usageLimit: usageLimit ? parseInt(usageLimit) : undefined,
-            usageCount: usageCount ? parseInt(usageCount) : undefined,
-            isUsed: isUsed === "true",
-            source: source || undefined,
-            referralId: referralId || undefined,
-            userIds: userIdsRaw ? userIdsRaw.split("|").filter(Boolean) : [],
-            createdAt: parsedCreated && !isNaN(parsedCreated.getTime()) ? parsedCreated : new Date(),
-          };
-          await CouponService.createCoupon(couponData);
-          created++;
+        const { headers, rows } = parseCSVText(text);
+
+        const protectedInFile = headers.filter((h) =>
+          (COUPON_PROTECTED_FIELDS as readonly string[]).includes(h)
+        );
+        if (protectedInFile.length > 0) {
+          toast.error(`CSV contains protected columns: ${protectedInFile.join(", ")}. Remove them and re-upload.`);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+          return;
         }
-        toast.success(`Imported ${created} coupon(s).`);
+
+        const storeIds = useStoreStore.getState().stores.map((s) => s.docId!);
+        const existingCouponIds = useCouponStore.getState().coupons.map((c) => c.docId!);
+        const validImportCols = new Set([...(COUPON_IMPORTABLE_FIELDS as readonly string[]), "docId"]);
+
+        const validRows: Record<string, string>[] = [];
+        const errors: ImportError[] = [];
+
+        rows.forEach((cols, idx) => {
+          const rowNum = idx + 2;
+          const row: Record<string, string> = {};
+          headers.forEach((h, i) => { row[h] = cols[i] ?? ""; });
+
+          const unknownCols = headers.filter((h) => !validImportCols.has(h));
+          unknownCols.forEach((col) =>
+            errors.push({ row: rowNum, field: col, reason: `Unknown column "${col}" will be ignored` })
+          );
+
+          let hasError = false;
+
+          if (row.docId && !existingCouponIds.includes(row.docId)) {
+            errors.push({ row: rowNum, field: "docId", reason: "Coupon not found — cannot update" });
+            hasError = true;
+          }
+
+          if (!row.docId && !row.code) {
+            errors.push({ row: rowNum, field: "code", reason: "code is required for new coupons" });
+            hasError = true;
+          }
+
+          if (row.amount && (isNaN(parseFloat(row.amount)) || parseFloat(row.amount) < 0)) {
+            errors.push({ row: rowNum, field: "amount", reason: "Must be a non-negative number" });
+            hasError = true;
+          }
+
+          if (row.expiryDate && isNaN(new Date(row.expiryDate).getTime())) {
+            errors.push({ row: rowNum, field: "expiryDate", reason: "Invalid date format" });
+            hasError = true;
+          }
+
+          if (row.usageLimit && (isNaN(parseInt(row.usageLimit)) || parseInt(row.usageLimit) < 0)) {
+            errors.push({ row: rowNum, field: "usageLimit", reason: "Must be a non-negative integer" });
+            hasError = true;
+          }
+
+          if (row.storeId && !storeIds.includes(row.storeId)) {
+            errors.push({ row: rowNum, field: "storeId", reason: `Store "${row.storeId}" does not exist` });
+            hasError = true;
+          }
+
+          if (row.isUsed && !["true", "false"].includes(row.isUsed.toLowerCase())) {
+            errors.push({ row: rowNum, field: "isUsed", reason: 'Must be "true" or "false"' });
+            hasError = true;
+          }
+
+          if (!hasError) validRows.push(row);
+        });
+
+        setImportPreview({ validRows, errors });
       } catch {
-        toast.error("Failed to import CSV. Check the file format.");
+        toast.error("Failed to read CSV file.");
       } finally {
-        setImportLoading(false);
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     };
     reader.readAsText(file);
+  }
+
+  async function handleConfirmImport() {
+    if (!importPreview || importPreview.validRows.length === 0) return;
+    setImportLoading(true);
+    try {
+      let count = 0;
+      for (const row of importPreview.validRows) {
+        const data: Partial<Omit<Coupon, "docId">> = {};
+        if (row.code) data.code = row.code;
+        if (row.type) data.type = row.type;
+        if (row.amount) data.amount = parseFloat(row.amount);
+        if (row.expiryDate) data.expiryDate = new Date(row.expiryDate);
+        if (row.storeId) data.storeId = row.storeId;
+        if (row.notes) data.notes = row.notes;
+        if (row.usageLimit) data.usageLimit = parseInt(row.usageLimit);
+        if (row.isUsed !== undefined && row.isUsed !== "") data.isUsed = row.isUsed.toLowerCase() === "true";
+
+        if (row.docId) {
+          await CouponService.updateCoupon(row.docId, data);
+        } else {
+          await CouponService.createCoupon(data as Omit<Coupon, "docId">);
+        }
+        count++;
+      }
+      toast.success(`Imported ${count} coupon(s).`);
+      setImportPreview(null);
+    } catch {
+      toast.error("Failed to import coupons.");
+    } finally {
+      setImportLoading(false);
+    }
   }
 
   // ── Render ──
@@ -327,15 +392,15 @@ export default function CouponsPage() {
             onChange={handleImportCSV}
             className="hidden"
           />
-          {/* <Button
+<Button
             variant="outline"
             size="sm"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setShowImportInfo(true)}
             disabled={importLoading}
           >
             {importLoading ? "Importing…" : "Import CSV"}
-          </Button> */}
-          <Button size="sm" onClick={exportToCSV}>
+          </Button>
+          <Button size="sm" onClick={exportToCSV} disabled={filtered.length === 0}>
             Export CSV
           </Button>
         </div>
@@ -502,6 +567,80 @@ export default function CouponsPage() {
           </tbody>
         </table>
       </div>
+
+      {/* CSV Field Guide Dialog */}
+      <Dialog open={showImportInfo} onOpenChange={setShowImportInfo}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>CSV Import Guide — Coupons</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2 text-sm">
+            <div className="space-y-1.5">
+              <p className="font-medium text-black">Editable fields</p>
+              <div className="flex flex-wrap gap-1.5">
+                {(["code", "type", "amount", "expiryDate", "storeId", "notes", "usageLimit", "isUsed"] as const).map((f) => (
+                  <span key={f} className="rounded-md bg-background border border-border px-2 py-0.5 text-xs text-black font-mono">{f}</span>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <p className="font-medium text-black">Required fields <span className="text-xs font-normal text-light-grey">(for new rows)</span></p>
+              <div className="flex flex-wrap gap-1.5">
+                <span className="rounded-md bg-amber-50 border border-amber-300 px-2 py-0.5 text-xs text-amber-800 font-mono">code</span>
+              </div>
+            </div>
+            <p className="text-xs text-light-grey leading-relaxed">
+              Include <span className="font-mono text-black">docId</span> to update an existing coupon. Omit it to create a new one. The <span className="font-mono text-black">expiryDate</span> field accepts any valid date string.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImportInfo(false)}>Cancel</Button>
+            <Button onClick={() => { setShowImportInfo(false); fileInputRef.current?.click(); }}>
+              Choose File →
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Preview Dialog */}
+      <Dialog open={importPreview !== null} onOpenChange={() => setImportPreview(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Import Preview</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {importPreview && importPreview.errors.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-black">
+                  {importPreview.errors.filter((e) => e.reason.includes("ignored")).length > 0
+                    ? "Warnings & Errors"
+                    : "Errors"}
+                </p>
+                <div className="max-h-48 overflow-y-auto rounded-lg border border-border bg-background p-3 space-y-1">
+                  {importPreview.errors.map((e, i) => (
+                    <p key={i} className="text-xs text-black">
+                      <span className="font-medium">Row {e.row}</span> — {e.field}: {e.reason}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="text-sm text-black">
+              <span className="font-medium">{importPreview?.validRows.length ?? 0}</span> row(s) will be imported.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportPreview(null)} disabled={importLoading}>
+              Cancel
+            </Button>
+            {(importPreview?.validRows.length ?? 0) > 0 && (
+              <Button onClick={handleConfirmImport} disabled={importLoading}>
+                {importLoading ? "Importing…" : `Import ${importPreview?.validRows.length} row(s)`}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Dialog */}
       <Dialog

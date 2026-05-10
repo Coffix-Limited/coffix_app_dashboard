@@ -5,6 +5,8 @@ import { useLogStore } from "./store/useLogStore";
 import { Log } from "./interface/log";
 import { formatDateTime } from "@/app/utils/formatting";
 import { useUserStore } from "@/app/dashboard/users/store/useUserStore";
+import { escapeCSV, tsToISO, triggerCSVDownload } from "@/app/utils/csvUtils";
+import { Button } from "@/components/ui/button";
 
 const SEVERITY_STYLES: Record<string, string> = {
   error: "bg-red-100 text-red-700",
@@ -45,13 +47,36 @@ export default function LogsPage() {
     return logs.filter((log) => matches(log, q, userEmailMap));
   }, [logs, search, userEmailMap]);
 
+  function exportToCSV() {
+    const headers = ["docId", "time", "page", "category", "severityLevel", "action", "notes", "customerId", "userId"];
+    const rows = displayed.map((log) =>
+      [
+        escapeCSV(log.docId ?? ""),
+        escapeCSV(tsToISO(log.time) || formatDateTime(log.time)),
+        escapeCSV(log.page ?? ""),
+        escapeCSV(log.category ?? ""),
+        escapeCSV(log.severityLevel ?? ""),
+        escapeCSV(log.action ?? ""),
+        escapeCSV(log.notes ?? ""),
+        escapeCSV(log.customerId ?? ""),
+        escapeCSV(log.userId ?? ""),
+      ].join(",")
+    );
+    triggerCSVDownload([headers.join(","), ...rows].join("\n"), `logs-${new Date().toISOString().slice(0, 10)}.csv`);
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-black">Logs</h1>
-        <p className="mt-1 text-sm text-light-grey">
-          {logs.length} log{logs.length !== 1 ? "s" : ""} total
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-black">Logs</h1>
+          <p className="mt-1 text-sm text-light-grey">
+            {logs.length} log{logs.length !== 1 ? "s" : ""} total
+          </p>
+        </div>
+        <Button size="sm" onClick={exportToCSV} disabled={displayed.length === 0}>
+          Export CSV
+        </Button>
       </div>
 
       <input

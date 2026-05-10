@@ -8,6 +8,7 @@ import { EmailTemplateService } from "./service/EmailTemplateService";
 import { EmailTemplate } from "./interface/emailTemplate";
 import { useAuth } from "@/app/lib/AuthContext";
 import { formatDateTime, formatDocId } from "@/app/utils/formatting";
+import { escapeCSV, tsToISO, triggerCSVDownload } from "@/app/utils/csvUtils";
 import { Button } from "@/components/ui/button";
 import { renderEmailTemplate } from "@/app/lib/renderEmailTemplate";
 import { sanitizeHtml } from "@/app/lib/sanitize";
@@ -368,6 +369,20 @@ export default function EmailTemplatesPage() {
     return result;
   }, [templates, search, sortKey, sortDir]);
 
+  function exportToCSV() {
+    const headers = ["docId", "name", "subject", "notes", "updatedAt"];
+    const rows = displayed.map((t) =>
+      [
+        escapeCSV(t.docId),
+        escapeCSV(t.name),
+        escapeCSV(t.subject),
+        escapeCSV(t.notes ?? ""),
+        escapeCSV(t.updatedAt ? tsToISO(t.updatedAt.toDate()) : ""),
+      ].join(",")
+    );
+    triggerCSVDownload([headers.join(","), ...rows].join("\n"), `email-templates-${new Date().toISOString().slice(0, 10)}.csv`);
+  }
+
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState<TemplateForm>(emptyForm);
   const [createErrors, setCreateErrors] = useState<TemplateFormErrors>({});
@@ -485,12 +500,21 @@ export default function EmailTemplatesPage() {
             {templates.length} template{templates.length !== 1 ? "s" : ""} total
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
-        >
-          + New Template
-        </button>
+        <div className="flex gap-2">
+<button
+            onClick={exportToCSV}
+            disabled={displayed.length === 0}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-black transition-opacity hover:opacity-80 disabled:opacity-40"
+          >
+            Export CSV
+          </button>
+          <button
+            onClick={openCreate}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
+          >
+            + New Template
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

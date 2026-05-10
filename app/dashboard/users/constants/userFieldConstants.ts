@@ -1,0 +1,51 @@
+export const USER_PROTECTED_FIELDS = [
+  "docId",
+  "email",
+  "creditAvailable",
+  "emailVerified",
+  "lastLogin",
+  "qrId",
+  "fcmToken",
+  "appVersion",
+  "creditExpiry",
+  "createdAt",
+] as const;
+
+export const USER_IMPORTABLE_FIELDS = [
+  "firstName",
+  "lastName",
+  "nickName",
+  "mobile",
+  "birthday",
+  "suburb",
+  "city",
+  "preferredStoreId",
+  "getPurchaseInfoByMail",
+  "getPromotions",
+  "allowWinACoffee",
+  "disabled",
+] as const;
+
+export const USER_EXPORTABLE_FIELDS = [
+  "docId",
+  "email",
+  "creditAvailable",
+  "emailVerified",
+  "lastLogin",
+  "creditExpiry",
+  "createdAt",
+  "firstName",
+  "lastName",
+  "nickName",
+  "mobile",
+  "birthday",
+  "suburb",
+  "city",
+  "preferredStoreId",
+  "getPurchaseInfoByMail",
+  "getPromotions",
+  "allowWinACoffee",
+  "disabled",
+] as const;
+
+export const USER_REQUIRED_FIELDS: string[] = [];
