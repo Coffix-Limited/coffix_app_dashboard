@@ -20,6 +20,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { StoresFilterBar } from "./components/StoresFilterBar";
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
 type Day = typeof DAYS[number];
@@ -68,6 +69,13 @@ export default function StoresPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"All" | "Open" | "Closed" | "Disabled">("All");
+  const [filterEmail, setFilterEmail] = useState("");
+  const [filterContactNumber, setFilterContactNumber] = useState("");
+  const [filterLocation, setFilterLocation] = useState("");
+  const [filterAddress, setFilterAddress] = useState("");
+  const [filterStoreCode, setFilterStoreCode] = useState("");
+  const [filterPrinterId, setFilterPrinterId] = useState("");
+
   type StoreSortKey = "name" | "status";
   type SortDir = "asc" | "desc";
   const [sortKey, setSortKey] = useState<StoreSortKey>("name");
@@ -76,6 +84,31 @@ export default function StoresPage() {
   function toggleSort(key: StoreSortKey) {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortKey(key); setSortDir("asc"); }
+  }
+
+  const anyFilterActive = useMemo(() => {
+    return (
+      search.trim() !== "" ||
+      statusFilter !== "All" ||
+      filterEmail.trim() !== "" ||
+      filterContactNumber.trim() !== "" ||
+      filterLocation.trim() !== "" ||
+      filterAddress.trim() !== "" ||
+      filterStoreCode.trim() !== "" ||
+      filterPrinterId.trim() !== ""
+    );
+  }, [search, statusFilter, filterEmail, filterContactNumber,
+      filterLocation, filterAddress, filterStoreCode, filterPrinterId]);
+
+  function clearAllFilters() {
+    setSearch("");
+    setStatusFilter("All");
+    setFilterEmail("");
+    setFilterContactNumber("");
+    setFilterLocation("");
+    setFilterAddress("");
+    setFilterStoreCode("");
+    setFilterPrinterId("");
   }
 
   const displayed = useMemo(() => {
@@ -87,13 +120,17 @@ export default function StoresPage() {
         const storeStatus = disabled ? "Disabled" : open ? "Open" : "Closed";
         if (storeStatus !== statusFilter) return false;
       }
-      if (q) {
-        return (
-          (s.name ?? "").toLowerCase().includes(q) ||
-          (s.email ?? "").toLowerCase().includes(q) ||
-          (s.contactNumber ?? "").toLowerCase().includes(q)
-        );
-      }
+      if (q && !(
+        (s.name ?? "").toLowerCase().includes(q) ||
+        (s.email ?? "").toLowerCase().includes(q) ||
+        (s.contactNumber ?? "").toLowerCase().includes(q)
+      )) return false;
+      if (filterEmail.trim() && !(s.email ?? "").toLowerCase().includes(filterEmail.trim().toLowerCase())) return false;
+      if (filterContactNumber.trim() && !(s.contactNumber ?? "").toLowerCase().includes(filterContactNumber.trim().toLowerCase())) return false;
+      if (filterLocation.trim() && !(s.location ?? "").toLowerCase().includes(filterLocation.trim().toLowerCase())) return false;
+      if (filterAddress.trim() && !(s.address ?? "").toLowerCase().includes(filterAddress.trim().toLowerCase())) return false;
+      if (filterStoreCode.trim() && !(s.storeCode ?? "").toLowerCase().includes(filterStoreCode.trim().toLowerCase())) return false;
+      if (filterPrinterId.trim() && !(s.printerId ?? "").toLowerCase().includes(filterPrinterId.trim().toLowerCase())) return false;
       return true;
     });
     result = [...result].sort((a, b) => {
@@ -110,7 +147,9 @@ export default function StoresPage() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return result;
-  }, [stores, search, statusFilter, sortKey, sortDir]);
+  }, [stores, search, statusFilter, sortKey, sortDir,
+      filterEmail, filterContactNumber, filterLocation,
+      filterAddress, filterStoreCode, filterPrinterId]);
 
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<StoreForm>(emptyForm);
@@ -319,14 +358,14 @@ export default function StoresPage() {
             onChange={handleImportCSV}
             className="hidden"
           />
-<Button
+{/* <Button
             variant="outline"
             size="sm"
             onClick={() => setShowImportInfo(true)}
             disabled={importLoading}
           >
             {importLoading ? "Importing…" : "Import CSV"}
-          </Button>
+          </Button> */}
           <Button
             variant="outline"
             size="sm"
@@ -335,35 +374,28 @@ export default function StoresPage() {
           >
             Export CSV
           </Button>
-          <button
+          <Button
+            size="sm"
             onClick={() => setShowCreate(true)}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
           >
             + New Store
-          </button>
+          </Button>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          type="text"
-          placeholder="Search stores…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm text-black outline-none placeholder:text-light-grey focus:border-primary sm:max-w-xs"
-        />
-        <div className="flex flex-wrap gap-2">
-          {(["All", "Open", "Closed", "Disabled"] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setStatusFilter(v)}
-              className={`rounded-full border px-3 py-1 text-xs transition-colors ${statusFilter === v ? "border-primary bg-primary text-white" : "border-border text-black "}`}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
-      </div>
+      <StoresFilterBar
+        search={search} setSearch={setSearch}
+        statusFilter={statusFilter} setStatusFilter={(v) => setStatusFilter(v as "All" | "Open" | "Closed" | "Disabled")}
+        filterEmail={filterEmail} setFilterEmail={setFilterEmail}
+        filterContactNumber={filterContactNumber} setFilterContactNumber={setFilterContactNumber}
+        filterLocation={filterLocation} setFilterLocation={setFilterLocation}
+        filterAddress={filterAddress} setFilterAddress={setFilterAddress}
+        filterStoreCode={filterStoreCode} setFilterStoreCode={setFilterStoreCode}
+        filterPrinterId={filterPrinterId} setFilterPrinterId={setFilterPrinterId}
+        anyFilterActive={anyFilterActive}
+        clearAllFilters={clearAllFilters}
+      />
 
       <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
         <table className="w-full text-sm">

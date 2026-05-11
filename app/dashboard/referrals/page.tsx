@@ -211,14 +211,14 @@ export default function ReferralsPage() {
             onChange={handleImportCSV}
             className="hidden"
           />
-<Button
+{/* <Button
             variant="outline"
             size="sm"
             onClick={() => setShowImportInfo(true)}
             disabled={importLoading}
           >
             {importLoading ? "Importing…" : "Import CSV"}
-          </Button>
+          </Button> */}
           <Button
             size="sm"
             onClick={exportToCSV}

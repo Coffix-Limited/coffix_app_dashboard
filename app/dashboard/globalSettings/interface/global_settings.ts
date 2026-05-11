@@ -17,4 +17,7 @@ export interface GlobalSettings {
   referralExpiryDays?: number;
   couponDefaultAmount?: number;
   couponExpiryDays?: number;
+  scheduleOrder?: boolean;
+  shareCredit?: boolean;
+  withdrawBalance?: boolean;
 }

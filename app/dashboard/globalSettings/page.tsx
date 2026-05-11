@@ -226,6 +226,44 @@ function Field({
   );
 }
 
+// ─── Toggle field ─────────────────────────────────────────────────────────────
+
+function ToggleField({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <p className="text-sm font-medium text-black">{label}</p>
+        <p className="text-xs text-light-grey">{description}</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${
+          checked ? "bg-primary" : "bg-border"
+        }`}
+      >
+        <span
+          className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform ${
+            checked ? "translate-x-5" : "translate-x-0"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 
 function Section({
@@ -270,17 +308,39 @@ export default function GlobalSettingsPage() {
   const settings = useGlobalSettingsStore((s) => s.settings);
 
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [toggles, setToggles] = useState({
+    scheduleOrder: false,
+    shareCredit: false,
+    withdrawBalance: false,
+  });
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   useEffect(() => {
     if (settings) {
       setForm(settingsToForm(settings));
+      setToggles({
+        scheduleOrder: settings.scheduleOrder ?? false,
+        shareCredit: settings.shareCredit ?? false,
+        withdrawBalance: settings.withdrawBalance ?? false,
+      });
     }
   }, [settings]);
 
   function setField(field: keyof FormState) {
     return (v: string) => setForm((f) => ({ ...f, [field]: v }));
+  }
+
+  async function handleToggle(field: keyof typeof toggles, value: boolean) {
+    setToggles((t) => ({ ...t, [field]: value }));
+    try {
+      await GlobalSettingsService.updateSettings({ [field]: value });
+      toast.success("Setting updated.");
+    } catch (err) {
+      console.error(err);
+      setToggles((t) => ({ ...t, [field]: !value }));
+      toast.error("Failed to update setting.");
+    }
   }
 
   async function handleSave() {
@@ -292,7 +352,7 @@ export default function GlobalSettingsPage() {
 
     setLoading(true);
     try {
-      await GlobalSettingsService.updateSettings(formToPayload(form));
+      await GlobalSettingsService.updateSettings({ ...formToPayload(form), ...toggles });
       toast.success("Settings saved.");
     } catch (err) {
       console.error(err);
@@ -495,6 +555,27 @@ export default function GlobalSettingsPage() {
             value={form.tcUrl}
             onChange={setField("tcUrl")}
             placeholder="https://..."
+          />
+        </Section>
+
+        <Section title="Feature Flags">
+          <ToggleField
+            label="Schedule Order"
+            description="Allow customers to place orders for a future time"
+            checked={toggles.scheduleOrder}
+            onChange={(v) => handleToggle("scheduleOrder", v)}
+          />
+          <ToggleField
+            label="Share Credit"
+            description="Allow customers to gift Coffix Credit to others"
+            checked={toggles.shareCredit}
+            onChange={(v) => handleToggle("shareCredit", v)}
+          />
+          <ToggleField
+            label="Withdraw Balance"
+            description="Allow customers to withdraw their Coffix Credit balance"
+            checked={toggles.withdrawBalance}
+            onChange={(v) => handleToggle("withdrawBalance", v)}
           />
         </Section>
       </div>

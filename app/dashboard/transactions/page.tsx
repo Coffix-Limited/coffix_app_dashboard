@@ -11,6 +11,26 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/app/lib/AuthContext";
 import { toast } from "sonner";
 import { TransactionService } from "./service/TransactionService";
+import { TransactionsFilterBar } from "./components/TransactionsFilterBar";
+
+type DateRange = { from: string; to: string };
+type NumberRange = { min: string; max: string };
+
+function dateInRange(value: Date | undefined, from: string, to: string): boolean {
+  if (!from && !to) return true;
+  if (value === undefined || value === null) return false;
+  const d: Date =
+    typeof (value as unknown as { toDate?: () => Date }).toDate === "function"
+      ? (value as unknown as { toDate: () => Date }).toDate()
+      : (value as Date);
+  if (from && d < new Date(from)) return false;
+  if (to) {
+    const toEnd = new Date(to);
+    toEnd.setHours(23, 59, 59, 999);
+    if (d > toEnd) return false;
+  }
+  return true;
+}
 
 function PaymentMethodBadge({ method }: { method: PaymentMethod | null | undefined }) {
   if (!method) return <span className="text-black">—</span>;
@@ -49,9 +69,45 @@ export default function TransactionsPage() {
   const [invoicing, setInvoicing] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [filterCreatedAt, setFilterCreatedAt] = useState<DateRange>({ from: "", to: "" });
+  const [filterAmount, setFilterAmount] = useState<NumberRange>({ min: "", max: "" });
+  const [filterTotalAmount, setFilterTotalAmount] = useState<NumberRange>({ min: "", max: "" });
+  const [filterRecipientEmail, setFilterRecipientEmail] = useState("");
+  const [filterRecipientFullName, setFilterRecipientFullName] = useState("");
+
   useEffect(() => {
     setSelected(new Set());
-  }, [search, typeFilter, methodFilter]);
+  }, [search, typeFilter, methodFilter, filterStatus, filterCreatedAt,
+      filterAmount, filterTotalAmount, filterRecipientEmail, filterRecipientFullName]);
+
+  const anyFilterActive = useMemo(() => {
+    return (
+      search.trim() !== "" ||
+      typeFilter !== "All" ||
+      methodFilter !== "All" ||
+      filterStatus !== "All" ||
+      filterCreatedAt.from !== "" || filterCreatedAt.to !== "" ||
+      filterAmount.min !== "" || filterAmount.max !== "" ||
+      filterTotalAmount.min !== "" || filterTotalAmount.max !== "" ||
+      filterRecipientEmail.trim() !== "" ||
+      filterRecipientFullName.trim() !== ""
+    );
+  }, [search, typeFilter, methodFilter, filterStatus, filterCreatedAt, filterAmount,
+      filterTotalAmount, filterRecipientEmail, filterRecipientFullName]);
+
+  function clearAllFilters() {
+    setSearch("");
+    setTypeFilter("All");
+    setMethodFilter("All");
+    setFilterStatus("All");
+    setFilterCreatedAt({ from: "", to: "" });
+    setFilterAmount({ min: "", max: "" });
+    setFilterTotalAmount({ min: "", max: "" });
+    setFilterRecipientEmail("");
+    setFilterRecipientFullName("");
+    setSelected(new Set());
+  }
 
   function toggleSelectAll() {
     const allIds = displayed.map((tx) => tx.docId).filter((id): id is string => !!id);
@@ -127,6 +183,26 @@ export default function TransactionsPage() {
         const num = (tx.transactionNumber ?? "").toLowerCase();
         if (!email.includes(q) && !num.includes(q)) return false;
       }
+      if (filterStatus !== "All" && tx.status !== filterStatus) return false;
+      if (!dateInRange(tx.createdAt ?? undefined, filterCreatedAt.from, filterCreatedAt.to)) return false;
+      if (filterAmount.min !== "") {
+        const min = parseFloat(filterAmount.min);
+        if (!isNaN(min) && (tx.amount ?? 0) < min) return false;
+      }
+      if (filterAmount.max !== "") {
+        const max = parseFloat(filterAmount.max);
+        if (!isNaN(max) && (tx.amount ?? 0) > max) return false;
+      }
+      if (filterTotalAmount.min !== "") {
+        const min = parseFloat(filterTotalAmount.min);
+        if (!isNaN(min) && (tx.totalAmount ?? 0) < min) return false;
+      }
+      if (filterTotalAmount.max !== "") {
+        const max = parseFloat(filterTotalAmount.max);
+        if (!isNaN(max) && (tx.totalAmount ?? 0) > max) return false;
+      }
+      if (filterRecipientEmail.trim() && !(tx.recipientEmail ?? "").toLowerCase().includes(filterRecipientEmail.trim().toLowerCase())) return false;
+      if (filterRecipientFullName.trim() && !(tx.recipientFullName ?? "").toLowerCase().includes(filterRecipientFullName.trim().toLowerCase())) return false;
       return true;
     });
     result = [...result].sort((a, b) => {
@@ -142,7 +218,9 @@ export default function TransactionsPage() {
     });
     return result;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactions, users, search, typeFilter, methodFilter, sortKey, sortDir]);
+  }, [transactions, users, search, typeFilter, methodFilter, sortKey, sortDir,
+      filterStatus, filterCreatedAt, filterAmount, filterTotalAmount,
+      filterRecipientEmail, filterRecipientFullName]);
 
   useEffect(() => {
     if (!selectAllRef.current) return;
@@ -200,41 +278,20 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          type="text"
-          placeholder="Search by number or email…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm text-black outline-none placeholder:text-light-grey focus:border-primary sm:max-w-xs"
-        />
-
-        {uniqueTypes.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {(["All", ...uniqueTypes] as string[]).map((v) => (
-              <button
-                key={v}
-                onClick={() => setTypeFilter(v)}
-                className={`rounded-full border px-3 py-1 text-xs transition-colors ${typeFilter === v ? "border-primary bg-primary text-white" : "border-border text-black "}`}
-              >
-                {v === "All" ? "All Types" : v}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-2">
-          {(["All", "coffixCredit", "card", "wallet"] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setMethodFilter(v)}
-              className={`rounded-full border px-3 py-1 text-xs transition-colors ${methodFilter === v ? "border-primary bg-primary text-white" : "border-border text-black "}`}
-            >
-              {v === "All" ? "All Methods" : v === "coffixCredit" ? "Coffix Credit" : v === "card" ? "Credit Card" : "Wallet"}
-            </button>
-          ))}
-        </div>
-      </div>
+      <TransactionsFilterBar
+        search={search} setSearch={setSearch}
+        typeFilter={typeFilter} setTypeFilter={setTypeFilter}
+        uniqueTypes={uniqueTypes}
+        methodFilter={methodFilter} setMethodFilter={(v) => setMethodFilter(v as "All" | PaymentMethod)}
+        filterStatus={filterStatus} setFilterStatus={setFilterStatus}
+        filterCreatedAt={filterCreatedAt} setFilterCreatedAt={setFilterCreatedAt}
+        filterAmount={filterAmount} setFilterAmount={setFilterAmount}
+        filterTotalAmount={filterTotalAmount} setFilterTotalAmount={setFilterTotalAmount}
+        filterRecipientEmail={filterRecipientEmail} setFilterRecipientEmail={setFilterRecipientEmail}
+        filterRecipientFullName={filterRecipientFullName} setFilterRecipientFullName={setFilterRecipientFullName}
+        anyFilterActive={anyFilterActive}
+        clearAllFilters={clearAllFilters}
+      />
 
       <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
         <table className="w-full text-sm">

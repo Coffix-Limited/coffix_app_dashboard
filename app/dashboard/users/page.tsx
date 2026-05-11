@@ -19,7 +19,24 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { UsersFilterBar } from "./components/UsersFilterBar";
 
+
+function dateInRange(value: Date | undefined, from: string, to: string): boolean {
+  if (!from && !to) return true;
+  if (value === undefined || value === null) return false;
+  const d: Date =
+    typeof (value as unknown as { toDate?: () => Date }).toDate === "function"
+      ? (value as unknown as { toDate: () => Date }).toDate()
+      : (value as Date);
+  if (from && d < new Date(from)) return false;
+  if (to) {
+    const toEnd = new Date(to);
+    toEnd.setHours(23, 59, 59, 999);
+    if (d > toEnd) return false;
+  }
+  return true;
+}
 
 function getDisplayName(user: { firstName?: string; lastName?: string; nickName?: string }): string {
   const full = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
@@ -73,11 +90,33 @@ export default function UsersPage() {
   const stores = useStoreStore((s) => s.stores);
   const router = useRouter();
 
+  type BoolFilter = "Any" | "Yes" | "No";
+  type DateRange = { from: string; to: string };
+  type NumberRange = { min: string; max: string };
+
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"All" | "Active" | "Disabled">("All");
   const [storeFilter, setStoreFilter] = useState<string>("All");
   type SortDir = "asc" | "desc";
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const [filterEmail, setFilterEmail] = useState("");
+  const [filterDocId, setFilterDocId] = useState("");
+  const [filterSuburb, setFilterSuburb] = useState("");
+  const [filterCity, setFilterCity] = useState("");
+  const [filterAppVersion, setFilterAppVersion] = useState("");
+  const [filterQrId, setFilterQrId] = useState("");
+  const [filterMobile, setFilterMobile] = useState("");
+  const [filterBirthday, setFilterBirthday] = useState<DateRange>({ from: "", to: "" });
+  const [filterCreatedAt, setFilterCreatedAt] = useState<DateRange>({ from: "", to: "" });
+  const [filterLastLogin, setFilterLastLogin] = useState<DateRange>({ from: "", to: "" });
+  const [filterCreditExpiry, setFilterCreditExpiry] = useState<DateRange>({ from: "", to: "" });
+  const [filterEmailVerified, setFilterEmailVerified] = useState<BoolFilter>("Any");
+  const [filterGetPurchaseInfoByMail, setFilterGetPurchaseInfoByMail] = useState<BoolFilter>("Any");
+  const [filterGetPromotions, setFilterGetPromotions] = useState<BoolFilter>("Any");
+  const [filterAllowWinACoffee, setFilterAllowWinACoffee] = useState<BoolFilter>("Any");
+  const [filterDisabled, setFilterDisabled] = useState<BoolFilter>("Any");
+  const [filterCreditAvailable, setFilterCreditAvailable] = useState<NumberRange>({ min: "", max: "" });
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showAddCredits, setShowAddCredits] = useState(false);
@@ -96,8 +135,27 @@ export default function UsersPage() {
     setSelectedIds(new Set());
   }
 
-  function setStatusFilterAndClear(v: "All" | "Active" | "Disabled") {
-    setStatusFilter(v);
+  function clearAllFilters() {
+    setSearch("");
+    setStoreFilter("All");
+    setStatusFilter("All");
+    setFilterEmail("");
+    setFilterDocId("");
+    setFilterSuburb("");
+    setFilterCity("");
+    setFilterAppVersion("");
+    setFilterQrId("");
+    setFilterMobile("");
+    setFilterBirthday({ from: "", to: "" });
+    setFilterCreatedAt({ from: "", to: "" });
+    setFilterLastLogin({ from: "", to: "" });
+    setFilterCreditExpiry({ from: "", to: "" });
+    setFilterEmailVerified("Any");
+    setFilterGetPurchaseInfoByMail("Any");
+    setFilterGetPromotions("Any");
+    setFilterAllowWinACoffee("Any");
+    setFilterDisabled("Any");
+    setFilterCreditAvailable({ min: "", max: "" });
     clearSelection();
   }
 
@@ -105,6 +163,35 @@ export default function UsersPage() {
     setStoreFilter(v);
     clearSelection();
   }
+
+  const anyFilterActive = useMemo(() => {
+    return (
+      search.trim() !== "" ||
+      storeFilter !== "All" ||
+      filterEmail.trim() !== "" ||
+      filterDocId.trim() !== "" ||
+      filterSuburb.trim() !== "" ||
+      filterCity.trim() !== "" ||
+      filterAppVersion.trim() !== "" ||
+      filterQrId.trim() !== "" ||
+      filterMobile.trim() !== "" ||
+      filterBirthday.from !== "" || filterBirthday.to !== "" ||
+      filterCreatedAt.from !== "" || filterCreatedAt.to !== "" ||
+      filterLastLogin.from !== "" || filterLastLogin.to !== "" ||
+      filterCreditExpiry.from !== "" || filterCreditExpiry.to !== "" ||
+      filterEmailVerified !== "Any" ||
+      filterGetPurchaseInfoByMail !== "Any" ||
+      filterGetPromotions !== "Any" ||
+      filterAllowWinACoffee !== "Any" ||
+      filterDisabled !== "Any" ||
+      filterCreditAvailable.min !== "" || filterCreditAvailable.max !== ""
+    );
+  }, [
+    search, storeFilter, filterEmail, filterDocId, filterSuburb, filterCity,
+    filterAppVersion, filterQrId, filterMobile, filterBirthday, filterCreatedAt,
+    filterLastLogin, filterCreditExpiry, filterEmailVerified, filterGetPurchaseInfoByMail,
+    filterGetPromotions, filterAllowWinACoffee, filterDisabled, filterCreditAvailable,
+  ]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -114,11 +201,35 @@ export default function UsersPage() {
       if (storeFilter !== "All" && u.preferredStoreId !== storeFilter) return false;
       if (query) {
         const name = `${u.firstName ?? ""} ${u.lastName ?? ""} ${u.nickName ?? ""}`.toLowerCase();
-        return (
-          name.includes(query) ||
-          (u.email ?? "").toLowerCase().includes(query) ||
-          (u.mobile ?? "").toLowerCase().includes(query)
-        );
+        if (
+          !name.includes(query) &&
+          !(u.email ?? "").toLowerCase().includes(query) &&
+          !(u.mobile ?? "").toLowerCase().includes(query)
+        ) return false;
+      }
+      if (filterEmail.trim() && !(u.email ?? "").toLowerCase().includes(filterEmail.trim().toLowerCase())) return false;
+      if (filterDocId.trim() && !(u.docId ?? "").toLowerCase().includes(filterDocId.trim().toLowerCase())) return false;
+      if (filterSuburb.trim() && !(u.suburb ?? "").toLowerCase().includes(filterSuburb.trim().toLowerCase())) return false;
+      if (filterCity.trim() && !(u.city ?? "").toLowerCase().includes(filterCity.trim().toLowerCase())) return false;
+      if (filterAppVersion.trim() && !(u.appVersion ?? "").toLowerCase().includes(filterAppVersion.trim().toLowerCase())) return false;
+      if (filterQrId.trim() && !(u.qrId ?? "").toLowerCase().includes(filterQrId.trim().toLowerCase())) return false;
+      if (filterMobile.trim() && !(u.mobile ?? "").toLowerCase().includes(filterMobile.trim().toLowerCase())) return false;
+      if (!dateInRange(u.birthday, filterBirthday.from, filterBirthday.to)) return false;
+      if (!dateInRange(u.createdAt, filterCreatedAt.from, filterCreatedAt.to)) return false;
+      if (!dateInRange(u.lastLogin, filterLastLogin.from, filterLastLogin.to)) return false;
+      if (!dateInRange(u.creditExpiry, filterCreditExpiry.from, filterCreditExpiry.to)) return false;
+      if (filterEmailVerified !== "Any" && !!u.emailVerified !== (filterEmailVerified === "Yes")) return false;
+      if (filterGetPurchaseInfoByMail !== "Any" && !!u.getPurchaseInfoByMail !== (filterGetPurchaseInfoByMail === "Yes")) return false;
+      if (filterGetPromotions !== "Any" && !!u.getPromotions !== (filterGetPromotions === "Yes")) return false;
+      if (filterAllowWinACoffee !== "Any" && !!u.allowWinACoffee !== (filterAllowWinACoffee === "Yes")) return false;
+      if (filterDisabled !== "Any" && !!u.disabled !== (filterDisabled === "Yes")) return false;
+      if (filterCreditAvailable.min !== "") {
+        const min = parseFloat(filterCreditAvailable.min);
+        if (!isNaN(min) && (u.creditAvailable ?? 0) < min) return false;
+      }
+      if (filterCreditAvailable.max !== "") {
+        const max = parseFloat(filterCreditAvailable.max);
+        if (!isNaN(max) && (u.creditAvailable ?? 0) > max) return false;
       }
       return true;
     });
@@ -127,7 +238,13 @@ export default function UsersPage() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return result;
-  }, [users, search, statusFilter, storeFilter, sortDir]);
+  }, [
+    users, search, statusFilter, storeFilter, sortDir,
+    filterEmail, filterDocId, filterSuburb, filterCity, filterAppVersion,
+    filterQrId, filterMobile, filterBirthday, filterCreatedAt, filterLastLogin,
+    filterCreditExpiry, filterEmailVerified, filterGetPurchaseInfoByMail,
+    filterGetPromotions, filterAllowWinACoffee, filterDisabled, filterCreditAvailable,
+  ]);
 
   const allSelected = filtered.length > 0 && filtered.every((u) => selectedIds.has(u.docId!));
   const someSelected = !allSelected && filtered.some((u) => selectedIds.has(u.docId!));
@@ -322,14 +439,14 @@ export default function UsersPage() {
             onChange={handleImportCSV}
             className="hidden"
           />
-<Button
+{/* <Button
             variant="outline"
             size="sm"
             onClick={() => setShowImportInfo(true)}
             disabled={importLoading}
           >
             {importLoading ? "Importing…" : "Import CSV"}
-          </Button>
+          </Button> */}
           <Button
             size="sm"
             onClick={exportToCSV}
@@ -340,34 +457,30 @@ export default function UsersPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          type="text"
-          placeholder="Search by name, email or mobile…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm text-black outline-none placeholder:text-light-grey focus:border-primary sm:max-w-xs"
-        />
-        {stores.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setStoreFilterAndClear("All")}
-              className={`rounded-full border px-3 py-1 text-xs transition-colors ${storeFilter === "All" ? "border-primary bg-primary text-white" : "border-border text-black"}`}
-            >
-              All Stores
-            </button>
-            {stores.map((store) => (
-              <button
-                key={store.docId}
-                onClick={() => setStoreFilterAndClear(store.docId)}
-                className={`rounded-full border px-3 py-1 text-xs transition-colors ${storeFilter === store.docId ? "border-primary bg-primary text-white" : "border-border text-black"}`}
-              >
-                {store.name ?? store.docId}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      <UsersFilterBar
+        search={search} setSearch={setSearch}
+        filterEmail={filterEmail} setFilterEmail={setFilterEmail}
+        filterDocId={filterDocId} setFilterDocId={setFilterDocId}
+        filterMobile={filterMobile} setFilterMobile={setFilterMobile}
+        filterSuburb={filterSuburb} setFilterSuburb={setFilterSuburb}
+        filterCity={filterCity} setFilterCity={setFilterCity}
+        filterQrId={filterQrId} setFilterQrId={setFilterQrId}
+        filterAppVersion={filterAppVersion} setFilterAppVersion={setFilterAppVersion}
+        storeFilter={storeFilter} setStoreFilter={setStoreFilterAndClear}
+        stores={stores}
+        filterBirthday={filterBirthday} setFilterBirthday={setFilterBirthday}
+        filterCreatedAt={filterCreatedAt} setFilterCreatedAt={setFilterCreatedAt}
+        filterLastLogin={filterLastLogin} setFilterLastLogin={setFilterLastLogin}
+        filterCreditExpiry={filterCreditExpiry} setFilterCreditExpiry={setFilterCreditExpiry}
+        filterEmailVerified={filterEmailVerified} setFilterEmailVerified={setFilterEmailVerified}
+        filterDisabled={filterDisabled} setFilterDisabled={setFilterDisabled}
+        filterGetPurchaseInfoByMail={filterGetPurchaseInfoByMail} setFilterGetPurchaseInfoByMail={setFilterGetPurchaseInfoByMail}
+        filterGetPromotions={filterGetPromotions} setFilterGetPromotions={setFilterGetPromotions}
+        filterAllowWinACoffee={filterAllowWinACoffee} setFilterAllowWinACoffee={setFilterAllowWinACoffee}
+        filterCreditAvailable={filterCreditAvailable} setFilterCreditAvailable={setFilterCreditAvailable}
+        anyFilterActive={anyFilterActive}
+        clearAllFilters={clearAllFilters}
+      />
 
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 rounded-xl border border-border bg-white px-5 py-3 shadow-(--shadow)">

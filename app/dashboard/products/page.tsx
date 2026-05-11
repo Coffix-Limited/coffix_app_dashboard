@@ -22,6 +22,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { ProductsFilterBar } from "./components/ProductsFilterBar";
 
 type NewProductForm = {
   name: string;
@@ -128,16 +129,33 @@ export default function ProductsPage() {
   const stores = useStoreStore((s) => s.stores);
 
   const router = useRouter();
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  type NumberRange = { min: string; max: string };
   type ProductSortKey = "name" | "price" | "cost";
   type SortDir = "asc" | "desc";
+
+  const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<ProductSortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const [filterCategoryId, setFilterCategoryId] = useState("All");
+  const [filterPrice, setFilterPrice] = useState<NumberRange>({ min: "", max: "" });
+  const [filterCost, setFilterCost] = useState<NumberRange>({ min: "", max: "" });
+  const [filterAvailableInStore, setFilterAvailableInStore] = useState("All");
+  const [filterDisabledInStore, setFilterDisabledInStore] = useState("All");
 
   function toggleSort(key: ProductSortKey) {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortKey(key); setSortDir("asc"); }
+  }
+
+  function clearAllFilters() {
+    setSearch("");
+    setFilterCategoryId("All");
+    setFilterPrice({ min: "", max: "" });
+    setFilterCost({ min: "", max: "" });
+    setFilterAvailableInStore("All");
+    setFilterDisabledInStore("All");
+    setSelectedIds(new Set());
   }
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -159,7 +177,7 @@ export default function ProductsPage() {
   const [showImportInfo, setShowImportInfo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const isDragMode = !search && selectedCategory === "All" && sortKey === "name" && sortDir === "asc";
+  const isDragMode = !search && filterCategoryId === "All" && sortKey === "name" && sortDir === "asc";
 
   async function handleDragEnd() {
     const fromIdx = dragIndexRef.current;
@@ -192,12 +210,41 @@ export default function ProductsPage() {
     ...Array.from(new Set(products.map((p) => getCategoryName(p.categoryId)))),
   ];
 
+  const anyFilterActive = useMemo(() => {
+    return (
+      search.trim() !== "" ||
+      filterCategoryId !== "All" ||
+      filterPrice.min !== "" || filterPrice.max !== "" ||
+      filterCost.min !== "" || filterCost.max !== "" ||
+      filterAvailableInStore !== "All" ||
+      filterDisabledInStore !== "All"
+    );
+  }, [search, filterCategoryId, filterPrice, filterCost,
+      filterAvailableInStore, filterDisabledInStore]);
+
   const filtered = useMemo(() => {
     let result = products.filter((p) => {
-      const matchesSearch = (p.name ?? "").toLowerCase().includes(search.toLowerCase());
-      const matchesCategory =
-        selectedCategory === "All" ? true : getCategoryName(p.categoryId) === selectedCategory;
-      return matchesSearch && matchesCategory;
+      if (!(p.name ?? "").toLowerCase().includes(search.toLowerCase())) return false;
+      if (filterCategoryId !== "All" && getCategoryName(p.categoryId) !== filterCategoryId) return false;
+      if (filterPrice.min !== "") {
+        const min = parseFloat(filterPrice.min);
+        if (!isNaN(min) && (p.price ?? 0) < min) return false;
+      }
+      if (filterPrice.max !== "") {
+        const max = parseFloat(filterPrice.max);
+        if (!isNaN(max) && (p.price ?? 0) > max) return false;
+      }
+      if (filterCost.min !== "") {
+        const min = parseFloat(filterCost.min);
+        if (!isNaN(min) && (p.cost ?? 0) < min) return false;
+      }
+      if (filterCost.max !== "") {
+        const max = parseFloat(filterCost.max);
+        if (!isNaN(max) && (p.cost ?? 0) > max) return false;
+      }
+      if (filterAvailableInStore !== "All" && !(p.availableToStores ?? []).includes(filterAvailableInStore)) return false;
+      if (filterDisabledInStore !== "All" && !(p.disabledStores ?? []).includes(filterDisabledInStore)) return false;
+      return true;
     });
     result = [...result].sort((a, b) => {
       let cmp = 0;
@@ -207,7 +254,8 @@ export default function ProductsPage() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return result;
-  }, [products, search, selectedCategory, getCategoryName, sortKey, sortDir]);
+  }, [products, search, filterCategoryId, getCategoryName, sortKey, sortDir,
+      filterPrice, filterCost, filterAvailableInStore, filterDisabledInStore]);
 
   useEffect(() => {
     setOrderedProducts(filtered);
@@ -516,14 +564,14 @@ export default function ProductsPage() {
             onChange={handleImportCSV}
             className="hidden"
           />
-<Button
+{/* <Button
             variant="outline"
             size="sm"
             onClick={() => setShowImportInfo(true)}
             disabled={importLoading}
           >
             {importLoading ? "Importing…" : "Import CSV"}
-          </Button>
+          </Button> */}
           <Button
             variant="outline"
             size="sm"
@@ -538,29 +586,18 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <input
-          type="text"
-          placeholder="Search products..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm text-black outline-none placeholder:text-black focus:border-primary sm:max-w-xs"
-        />
-        <div className="flex flex-wrap gap-2">
-          {categoryFilters.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${selectedCategory === cat
-                ? "bg-primary text-white"
-                : "bg-[#f0f0f0] text-black hover:bg-[#e0e0e0]"
-                }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-      </div>
+      <ProductsFilterBar
+        search={search} setSearch={setSearch}
+        filterCategoryId={filterCategoryId} setFilterCategoryId={setFilterCategoryId}
+        categoryNames={categoryFilters.filter((c) => c !== "All")}
+        filterPrice={filterPrice} setFilterPrice={setFilterPrice}
+        filterCost={filterCost} setFilterCost={setFilterCost}
+        filterAvailableInStore={filterAvailableInStore} setFilterAvailableInStore={setFilterAvailableInStore}
+        filterDisabledInStore={filterDisabledInStore} setFilterDisabledInStore={setFilterDisabledInStore}
+        stores={stores}
+        anyFilterActive={anyFilterActive}
+        clearAllFilters={clearAllFilters}
+      />
 
       {/* Bulk action toolbar */}
       {selectedIds.size > 0 && (
