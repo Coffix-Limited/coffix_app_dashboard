@@ -4,6 +4,22 @@ import { Transaction } from "../interface/transaction";
 import { Order } from "../interface/order";
 
 export const TransactionService = {
+  sendInvoice: async (transactionId: string, token: string): Promise<void> => {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}/transaction/invoice`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ transactionId }),
+      }
+    );
+    if (!res.ok) throw new Error(`Failed for ${transactionId}`);
+  },
+
+
   listenToTransactions: (onUpdate: (items: Transaction[]) => void): Unsubscribe =>
     onSnapshot(
       query(collection(db, "transactions"), orderBy("createdAt", "desc")),

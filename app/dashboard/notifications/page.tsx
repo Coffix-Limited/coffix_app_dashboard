@@ -7,9 +7,9 @@ import { Plus, X } from "lucide-react";
 
 import { useNotificationStore } from "./store/useNotificationStore";
 import { useStoreStore } from "@/app/dashboard/stores/store/useStoreStore";
-import { useStaffStore } from "@/app/dashboard/staffs/store/useStaffStore";
 import { useAuth } from "@/app/lib/AuthContext";
 import { NotificationService } from "./service/NotificationService";
+import { escapeCSV, tsToISO, triggerCSVDownload } from "@/app/utils/csvUtils";
 import {
   NotificationCampaign,
   NotificationChannel,
@@ -336,10 +336,10 @@ function CampaignDialog({
                 </label>
               ))}
               {/* SMS — placeholder, not yet available */}
-              <label className="flex cursor-not-allowed items-center gap-2 opacity-50">
+              <label className="flex cursor-not-allowed items-center gap-2 opacity-60">
                 <input type="checkbox" disabled className="accent-primary" />
                 <span className="text-sm text-black">SMS</span>
-                <span className="rounded-full bg-soft-grey px-2 py-0.5 text-xs text-light-grey">
+                <span className="rounded-full px-2 py-0.5 text-xs text-light-grey">
                   Coming soon
                 </span>
               </label>
@@ -700,10 +700,8 @@ function CampaignDialog({
 export default function NotificationsPage() {
   const campaigns = useNotificationStore((s) => s.campaigns);
   const stores = useStoreStore((s) => s.stores);
-  const staffs = useStaffStore((s) => s.staffs);
-  const { user } = useAuth();
+  const { currentStaff, user } = useAuth();
 
-  const currentStaff = staffs.find((s) => s.docId === user?.uid);
   const isAdmin = currentStaff?.role === "admin";
 
   const [search, setSearch] = useState("");
@@ -739,6 +737,21 @@ export default function NotificationsPage() {
     });
     return result;
   }, [campaigns, search, statusFilter, channelFilter, sortKey, sortDir]);
+
+  function exportToCSV() {
+    const headers = ["docId", "name", "status", "channels", "createdAt", "sentAt"];
+    const rows = displayed.map((c) =>
+      [
+        escapeCSV(c.docId ?? ""),
+        escapeCSV(c.name),
+        escapeCSV(c.status),
+        escapeCSV(c.channels.join("|")),
+        escapeCSV(tsToISO(c.createdAt)),
+        escapeCSV(c.sentAt ? tsToISO(c.sentAt) : ""),
+      ].join(",")
+    );
+    triggerCSVDownload([headers.join(","), ...rows].join("\n"), `campaigns-${new Date().toISOString().slice(0, 10)}.csv`);
+  }
 
   const [showCreate, setShowCreate] = useState(false);
   const [editTarget, setEditTarget] = useState<NotificationCampaign | null>(null);
@@ -838,6 +851,8 @@ export default function NotificationsPage() {
     }
   }
 
+  console.log(isAdmin, currentStaff?.role ?? "no role");
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -848,15 +863,24 @@ export default function NotificationsPage() {
             {campaigns.length} campaign{campaigns.length !== 1 ? "s" : ""} total
           </p>
         </div>
-        {isAdmin && (
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
+        <div className="flex gap-2">
+<button
+            onClick={exportToCSV}
+            disabled={displayed.length === 0}
+            className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-black transition-opacity hover:opacity-80 disabled:opacity-40"
           >
-            <Plus size={15} />
-            New Campaign
+            Export CSV
           </button>
-        )}
+          {isAdmin && (
+            <button
+              onClick={openCreate}
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
+            >
+              <Plus size={15} />
+              New Campaign
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

@@ -23,12 +23,15 @@ type FormState = {
   GST: string;
   appVersion: string;
   basicDiscount: string;
+  couponDefaultAmount: string;
+  couponExpiryDays: string;
   creditExpiryDuration: string;
   discountLevel2: string;
   discountLevel3: string;
   maxDayBetweenLogin: string;
   minCreditToShare: string;
   minTopUp: string;
+  referralExpiryDays: string;
   specialUrl: string;
   storeUrl: string;
   tcUrl: string;
@@ -42,12 +45,15 @@ function settingsToForm(s: GlobalSettings): FormState {
     GST: s.GST?.toString() ?? "",
     appVersion: s.appVersion ?? "",
     basicDiscount: s.basicDiscount?.toString() ?? "",
+    couponDefaultAmount: s.couponDefaultAmount?.toString() ?? "",
+    couponExpiryDays: s.couponExpiryDays?.toString() ?? "",
     creditExpiryDuration: s.creditExpiryDuration?.toString() ?? "",
     discountLevel2: s.discountLevel2?.toString() ?? "",
     discountLevel3: s.discountLevel3?.toString() ?? "",
     maxDayBetweenLogin: s.maxDayBetweenLogin?.toString() ?? "",
     minCreditToShare: s.minCreditToShare?.toString() ?? "",
     minTopUp: s.minTopUp?.toString() ?? "",
+    referralExpiryDays: s.referralExpiryDays?.toString() ?? "",
     specialUrl: s.specialUrl ?? "",
     storeUrl: s.storeUrl ?? "",
     tcUrl: s.tcUrl ?? "",
@@ -67,20 +73,23 @@ const NUMERIC_NON_NEGATIVE: (keyof FormState)[] = [
   "topupLevel3",
   "withdrawalFee",
 ];
-const NUMERIC_INTEGER: (keyof FormState)[] = ["creditExpiryDuration"];
-const NUMERIC_POSITIVE: (keyof FormState)[] = ["minCreditToShare", "minTopUp"];
+const NUMERIC_INTEGER: (keyof FormState)[] = ["creditExpiryDuration", "referralExpiryDays", "couponExpiryDays"];
+const NUMERIC_POSITIVE: (keyof FormState)[] = ["minCreditToShare", "minTopUp", "couponDefaultAmount"];
 const URL_FIELDS: (keyof FormState)[] = ["specialUrl", "storeUrl", "tcUrl"];
 
 const FIELD_LABELS: Record<keyof FormState, string> = {
   GST: "GST",
   appVersion: "Minimum App Version",
   basicDiscount: "Basic Discount",
+  couponDefaultAmount: "Coupon Default Amount",
+  couponExpiryDays: "Coupon Expiry Days",
   creditExpiryDuration: "Credit Expiry Duration",
   discountLevel2: "Discount Level 2",
   discountLevel3: "Discount Level 3",
   maxDayBetweenLogin: "Max Days Between Login",
   minCreditToShare: "Min Credit to Share",
   minTopUp: "Min Top Up",
+  referralExpiryDays: "Referral Expiry Days",
   specialUrl: "Special URL",
   storeUrl: "Store URL",
   tcUrl: "T&C URL",
@@ -147,6 +156,10 @@ function formToPayload(form: FormState): Partial<GlobalSettings> {
 
   if (form.creditExpiryDuration !== "")
     payload.creditExpiryDuration = parseInt(form.creditExpiryDuration, 10);
+  if (form.referralExpiryDays !== "")
+    payload.referralExpiryDays = parseInt(form.referralExpiryDays, 10);
+  if (form.couponExpiryDays !== "")
+    payload.couponExpiryDays = parseInt(form.couponExpiryDays, 10);
 
   if (form.appVersion) payload.appVersion = form.appVersion;
   for (const field of URL_FIELDS) {
@@ -213,6 +226,44 @@ function Field({
   );
 }
 
+// ─── Toggle field ─────────────────────────────────────────────────────────────
+
+function ToggleField({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <p className="text-sm font-medium text-black">{label}</p>
+        <p className="text-xs text-light-grey">{description}</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${
+          checked ? "bg-primary" : "bg-border"
+        }`}
+      >
+        <span
+          className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform ${
+            checked ? "translate-x-5" : "translate-x-0"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 
 function Section({
@@ -236,12 +287,15 @@ const emptyForm: FormState = {
   GST: "",
   appVersion: "",
   basicDiscount: "",
+  couponDefaultAmount: "",
+  couponExpiryDays: "",
   creditExpiryDuration: "",
   discountLevel2: "",
   discountLevel3: "",
   maxDayBetweenLogin: "",
   minCreditToShare: "",
   minTopUp: "",
+  referralExpiryDays: "",
   specialUrl: "",
   storeUrl: "",
   tcUrl: "",
@@ -254,17 +308,39 @@ export default function GlobalSettingsPage() {
   const settings = useGlobalSettingsStore((s) => s.settings);
 
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [toggles, setToggles] = useState({
+    scheduleOrder: false,
+    shareCredit: false,
+    withdrawBalance: false,
+  });
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   useEffect(() => {
     if (settings) {
       setForm(settingsToForm(settings));
+      setToggles({
+        scheduleOrder: settings.scheduleOrder ?? false,
+        shareCredit: settings.shareCredit ?? false,
+        withdrawBalance: settings.withdrawBalance ?? false,
+      });
     }
   }, [settings]);
 
   function setField(field: keyof FormState) {
     return (v: string) => setForm((f) => ({ ...f, [field]: v }));
+  }
+
+  async function handleToggle(field: keyof typeof toggles, value: boolean) {
+    setToggles((t) => ({ ...t, [field]: value }));
+    try {
+      await GlobalSettingsService.updateSettings({ [field]: value });
+      toast.success("Setting updated.");
+    } catch (err) {
+      console.error(err);
+      setToggles((t) => ({ ...t, [field]: !value }));
+      toast.error("Failed to update setting.");
+    }
   }
 
   async function handleSave() {
@@ -276,7 +352,7 @@ export default function GlobalSettingsPage() {
 
     setLoading(true);
     try {
-      await GlobalSettingsService.updateSettings(formToPayload(form));
+      await GlobalSettingsService.updateSettings({ ...formToPayload(form), ...toggles });
       toast.success("Settings saved.");
     } catch (err) {
       console.error(err);
@@ -420,6 +496,34 @@ export default function GlobalSettingsPage() {
           /> */}
         </Section>
 
+        <Section title="Referral & Coupons">
+          <Field
+            label="Referral Expiry Days"
+            type="number"
+            value={form.referralExpiryDays}
+            onChange={setField("referralExpiryDays")}
+            placeholder="30"
+            suffix="days"
+          />
+          <Field
+            label="Coupon Default Amount"
+            type="number"
+            value={form.couponDefaultAmount}
+            onChange={setField("couponDefaultAmount")}
+            placeholder="0.00"
+            prefix="$"
+            money
+          />
+          <Field
+            label="Coupon Expiry Days"
+            type="number"
+            value={form.couponExpiryDays}
+            onChange={setField("couponExpiryDays")}
+            placeholder="30"
+            suffix="days"
+          />
+        </Section>
+
         <Section title="App Config">
           <Field
             label="Minimum App Version"
@@ -451,6 +555,27 @@ export default function GlobalSettingsPage() {
             value={form.tcUrl}
             onChange={setField("tcUrl")}
             placeholder="https://..."
+          />
+        </Section>
+
+        <Section title="Feature Flags">
+          <ToggleField
+            label="Schedule Order"
+            description="Allow customers to place orders for a future time"
+            checked={toggles.scheduleOrder}
+            onChange={(v) => handleToggle("scheduleOrder", v)}
+          />
+          <ToggleField
+            label="Share Credit"
+            description="Allow customers to gift Coffix Credit to others"
+            checked={toggles.shareCredit}
+            onChange={(v) => handleToggle("shareCredit", v)}
+          />
+          <ToggleField
+            label="Withdraw Balance"
+            description="Allow customers to withdraw their Coffix Credit balance"
+            checked={toggles.withdrawBalance}
+            onChange={(v) => handleToggle("withdrawBalance", v)}
           />
         </Section>
       </div>

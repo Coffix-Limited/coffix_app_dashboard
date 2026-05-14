@@ -1,13 +1,26 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Image from "next/image";
 import { useStoreStore } from "./store/useStoreStore";
 import { isStoreOpenAt, DayHours } from "./interface/store";
 import { StoreService } from "./service/StoreService";
+import {
+  STORE_PROTECTED_FIELDS,
+  STORE_IMPORTABLE_FIELDS,
+} from "./constants/storeFieldConstants";
+import { escapeCSV, parseCSVText, triggerCSVDownload } from "@/app/utils/csvUtils";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { StoresFilterBar } from "./components/StoresFilterBar";
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
 type Day = typeof DAYS[number];
@@ -56,6 +69,13 @@ export default function StoresPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"All" | "Open" | "Closed" | "Disabled">("All");
+  const [filterEmail, setFilterEmail] = useState("");
+  const [filterContactNumber, setFilterContactNumber] = useState("");
+  const [filterLocation, setFilterLocation] = useState("");
+  const [filterAddress, setFilterAddress] = useState("");
+  const [filterStoreCode, setFilterStoreCode] = useState("");
+  const [filterPrinterId, setFilterPrinterId] = useState("");
+
   type StoreSortKey = "name" | "status";
   type SortDir = "asc" | "desc";
   const [sortKey, setSortKey] = useState<StoreSortKey>("name");
@@ -64,6 +84,31 @@ export default function StoresPage() {
   function toggleSort(key: StoreSortKey) {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortKey(key); setSortDir("asc"); }
+  }
+
+  const anyFilterActive = useMemo(() => {
+    return (
+      search.trim() !== "" ||
+      statusFilter !== "All" ||
+      filterEmail.trim() !== "" ||
+      filterContactNumber.trim() !== "" ||
+      filterLocation.trim() !== "" ||
+      filterAddress.trim() !== "" ||
+      filterStoreCode.trim() !== "" ||
+      filterPrinterId.trim() !== ""
+    );
+  }, [search, statusFilter, filterEmail, filterContactNumber,
+      filterLocation, filterAddress, filterStoreCode, filterPrinterId]);
+
+  function clearAllFilters() {
+    setSearch("");
+    setStatusFilter("All");
+    setFilterEmail("");
+    setFilterContactNumber("");
+    setFilterLocation("");
+    setFilterAddress("");
+    setFilterStoreCode("");
+    setFilterPrinterId("");
   }
 
   const displayed = useMemo(() => {
@@ -75,13 +120,17 @@ export default function StoresPage() {
         const storeStatus = disabled ? "Disabled" : open ? "Open" : "Closed";
         if (storeStatus !== statusFilter) return false;
       }
-      if (q) {
-        return (
-          (s.name ?? "").toLowerCase().includes(q) ||
-          (s.email ?? "").toLowerCase().includes(q) ||
-          (s.contactNumber ?? "").toLowerCase().includes(q)
-        );
-      }
+      if (q && !(
+        (s.name ?? "").toLowerCase().includes(q) ||
+        (s.email ?? "").toLowerCase().includes(q) ||
+        (s.contactNumber ?? "").toLowerCase().includes(q)
+      )) return false;
+      if (filterEmail.trim() && !(s.email ?? "").toLowerCase().includes(filterEmail.trim().toLowerCase())) return false;
+      if (filterContactNumber.trim() && !(s.contactNumber ?? "").toLowerCase().includes(filterContactNumber.trim().toLowerCase())) return false;
+      if (filterLocation.trim() && !(s.location ?? "").toLowerCase().includes(filterLocation.trim().toLowerCase())) return false;
+      if (filterAddress.trim() && !(s.address ?? "").toLowerCase().includes(filterAddress.trim().toLowerCase())) return false;
+      if (filterStoreCode.trim() && !(s.storeCode ?? "").toLowerCase().includes(filterStoreCode.trim().toLowerCase())) return false;
+      if (filterPrinterId.trim() && !(s.printerId ?? "").toLowerCase().includes(filterPrinterId.trim().toLowerCase())) return false;
       return true;
     });
     result = [...result].sort((a, b) => {
@@ -98,12 +147,21 @@ export default function StoresPage() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return result;
-  }, [stores, search, statusFilter, sortKey, sortDir]);
+  }, [stores, search, statusFilter, sortKey, sortDir,
+      filterEmail, filterContactNumber, filterLocation,
+      filterAddress, filterStoreCode, filterPrinterId]);
 
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<StoreForm>(emptyForm);
   const [errors, setErrors] = useState<Partial<Record<keyof StoreForm, boolean>>>({});
   const [loading, setLoading] = useState(false);
+
+  type ImportError = { row: number; field: string; reason: string };
+  type ImportPreview = { validRows: Record<string, string>[]; errors: ImportError[] } | null;
+  const [importLoading, setImportLoading] = useState(false);
+  const [importPreview, setImportPreview] = useState<ImportPreview>(null);
+  const [showImportInfo, setShowImportInfo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function setField<K extends keyof Omit<StoreForm, "openingHours">>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -124,6 +182,119 @@ export default function StoresPage() {
     setShowCreate(false);
     setForm(emptyForm);
     setErrors({});
+  }
+
+  function exportToCSV() {
+    const headers = ["docId", "name", "address", "email", "contactNumber", "location", "imageUrl", "gstNumber", "invoiceText", "storeCode", "printerId", "disable"];
+    const rows = displayed.map((s) =>
+      [
+        escapeCSV(s.docId ?? ""),
+        escapeCSV(s.name ?? ""),
+        escapeCSV(s.address ?? ""),
+        escapeCSV(s.email ?? ""),
+        escapeCSV(s.contactNumber ?? ""),
+        escapeCSV(s.location ?? ""),
+        escapeCSV(s.imageUrl ?? ""),
+        escapeCSV(s.gstNumber ?? ""),
+        escapeCSV(s.invoiceText ?? ""),
+        escapeCSV(s.storeCode ?? ""),
+        escapeCSV(s.printerId ?? ""),
+        String(s.disable ?? false),
+      ].join(",")
+    );
+    triggerCSVDownload([headers.join(","), ...rows].join("\n"), `stores-${new Date().toISOString().slice(0, 10)}.csv`);
+  }
+
+  function handleImportCSV(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const text = ev.target?.result as string;
+        const { headers, rows } = parseCSVText(text);
+
+        const protectedInFile = headers.filter((h) =>
+          (STORE_PROTECTED_FIELDS as readonly string[]).includes(h)
+        );
+        if (protectedInFile.length > 0) {
+          toast.error(`CSV contains protected columns: ${protectedInFile.join(", ")}. Remove them and re-upload.`);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+          return;
+        }
+
+        const existingStoreIds = useStoreStore.getState().stores.map((s) => s.docId);
+        const validImportCols = new Set([...(STORE_IMPORTABLE_FIELDS as readonly string[]), "docId"]);
+
+        const validRows: Record<string, string>[] = [];
+        const errors: ImportError[] = [];
+
+        rows.forEach((cols, idx) => {
+          const rowNum = idx + 2;
+          const row: Record<string, string> = {};
+          headers.forEach((h, i) => { row[h] = cols[i] ?? ""; });
+
+          headers.filter((h) => !validImportCols.has(h)).forEach((col) =>
+            errors.push({ row: rowNum, field: col, reason: `Unknown column "${col}" will be ignored` })
+          );
+
+          let hasError = false;
+
+          if (!row.docId) {
+            errors.push({ row: rowNum, field: "docId", reason: "docId is required to identify the store" });
+            hasError = true;
+          } else if (!existingStoreIds.includes(row.docId)) {
+            errors.push({ row: rowNum, field: "docId", reason: "Store not found — cannot update" });
+            hasError = true;
+          }
+
+          if (row.disable !== undefined && row.disable !== "" &&
+            !["true", "false"].includes(row.disable.toLowerCase())) {
+            errors.push({ row: rowNum, field: "disable", reason: 'Must be "true" or "false"' });
+            hasError = true;
+          }
+
+          if (!hasError) validRows.push(row);
+        });
+
+        setImportPreview({ validRows, errors });
+      } catch {
+        toast.error("Failed to read CSV file.");
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  async function handleConfirmImport() {
+    if (!importPreview || importPreview.validRows.length === 0) return;
+    setImportLoading(true);
+    try {
+      let count = 0;
+      for (const row of importPreview.validRows) {
+        const update: Record<string, unknown> = {};
+        if (row.name !== undefined && row.name !== "") update.name = row.name;
+        if (row.address !== undefined && row.address !== "") update.address = row.address;
+        if (row.email !== undefined && row.email !== "") update.email = row.email;
+        if (row.contactNumber !== undefined && row.contactNumber !== "") update.contactNumber = row.contactNumber;
+        if (row.location !== undefined && row.location !== "") update.location = row.location;
+        if (row.imageUrl !== undefined) update.imageUrl = row.imageUrl || null;
+        if (row.gstNumber !== undefined) update.gstNumber = row.gstNumber || null;
+        if (row.invoiceText !== undefined) update.invoiceText = row.invoiceText || null;
+        if (row.storeCode !== undefined) update.storeCode = row.storeCode;
+        if (row.printerId !== undefined) update.printerId = row.printerId;
+        if (row.disable !== undefined && row.disable !== "") update.disable = row.disable.toLowerCase() === "true";
+        await StoreService.updateStore(row.docId, update);
+        count++;
+      }
+      toast.success(`Updated ${count} store${count !== 1 ? "s" : ""}.`);
+      setImportPreview(null);
+    } catch {
+      toast.error("Failed to import stores.");
+    } finally {
+      setImportLoading(false);
+    }
   }
 
   async function handleCreate() {
@@ -179,34 +350,52 @@ export default function StoresPage() {
             {stores.length} store{stores.length !== 1 ? "s" : ""} total
           </p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
-        >
-          + New Store
-        </button>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          type="text"
-          placeholder="Search stores…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm text-black outline-none placeholder:text-light-grey focus:border-primary sm:max-w-xs"
-        />
-        <div className="flex flex-wrap gap-2">
-          {(["All", "Open", "Closed", "Disabled"] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setStatusFilter(v)}
-              className={`rounded-full border px-3 py-1 text-xs transition-colors ${statusFilter === v ? "border-primary bg-primary text-white" : "border-border text-black "}`}
-            >
-              {v}
-            </button>
-          ))}
+        <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleImportCSV}
+            className="hidden"
+          />
+{/* <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowImportInfo(true)}
+            disabled={importLoading}
+          >
+            {importLoading ? "Importing…" : "Import CSV"}
+          </Button> */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportToCSV}
+            disabled={displayed.length === 0}
+          >
+            Export CSV
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setShowCreate(true)}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
+          >
+            + New Store
+          </Button>
         </div>
       </div>
+
+      <StoresFilterBar
+        search={search} setSearch={setSearch}
+        statusFilter={statusFilter} setStatusFilter={(v) => setStatusFilter(v as "All" | "Open" | "Closed" | "Disabled")}
+        filterEmail={filterEmail} setFilterEmail={setFilterEmail}
+        filterContactNumber={filterContactNumber} setFilterContactNumber={setFilterContactNumber}
+        filterLocation={filterLocation} setFilterLocation={setFilterLocation}
+        filterAddress={filterAddress} setFilterAddress={setFilterAddress}
+        filterStoreCode={filterStoreCode} setFilterStoreCode={setFilterStoreCode}
+        filterPrinterId={filterPrinterId} setFilterPrinterId={setFilterPrinterId}
+        anyFilterActive={anyFilterActive}
+        clearAllFilters={clearAllFilters}
+      />
 
       <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
         <table className="w-full text-sm">
@@ -485,6 +674,74 @@ export default function StoresPage() {
           </div>
         </div>
       )}
+
+      {/* CSV Field Guide Dialog */}
+      <Dialog open={showImportInfo} onOpenChange={setShowImportInfo}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>CSV Import Guide — Stores</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2 text-sm">
+            <div className="space-y-1.5">
+              <p className="font-medium text-black">Editable fields</p>
+              <div className="flex flex-wrap gap-1.5">
+                {(["name", "address", "email", "contactNumber", "location", "imageUrl", "gstNumber", "invoiceText", "storeCode", "printerId", "disable"] as const).map((f) => (
+                  <span key={f} className="rounded-md bg-background border border-border px-2 py-0.5 text-xs text-black font-mono">{f}</span>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <p className="font-medium text-black">Required fields <span className="text-xs font-normal text-light-grey">(for new rows)</span></p>
+              <p className="text-xs text-light-grey">None — every row must include an existing <span className="font-mono text-black">docId</span>.</p>
+            </div>
+            <p className="text-xs text-light-grey leading-relaxed">
+              This entity is <span className="font-medium text-black">update-only</span>. Every row must include a valid <span className="font-mono text-black">docId</span>. The <span className="font-mono text-black">disable</span> field accepts <span className="font-mono text-black">true</span> or <span className="font-mono text-black">false</span>.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImportInfo(false)}>Cancel</Button>
+            <Button onClick={() => { setShowImportInfo(false); fileInputRef.current?.click(); }}>
+              Choose File →
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Preview Dialog */}
+      <Dialog open={importPreview !== null} onOpenChange={() => setImportPreview(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Import Preview</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {importPreview && importPreview.errors.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-black">Errors</p>
+                <div className="max-h-48 overflow-y-auto rounded-lg border border-border bg-background p-3 space-y-1">
+                  {importPreview.errors.map((e, i) => (
+                    <p key={i} className="text-xs text-black">
+                      <span className="font-medium">Row {e.row}</span> — {e.field}: {e.reason}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="text-sm text-black">
+              <span className="font-medium">{importPreview?.validRows.length ?? 0}</span> row(s) will be updated.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportPreview(null)} disabled={importLoading}>
+              Cancel
+            </Button>
+            {(importPreview?.validRows.length ?? 0) > 0 && (
+              <Button onClick={handleConfirmImport} disabled={importLoading}>
+                {importLoading ? "Updating…" : `Update ${importPreview?.validRows.length} row(s)`}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

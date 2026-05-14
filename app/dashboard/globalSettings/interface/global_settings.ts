@@ -14,4 +14,10 @@ export interface GlobalSettings {
   topupLevel3?: number;
   withdrawalFee?: number;
   creditExpiryDuration?: number;
+  referralExpiryDays?: number;
+  couponDefaultAmount?: number;
+  couponExpiryDays?: number;
+  scheduleOrder?: boolean;
+  shareCredit?: boolean;
+  withdrawBalance?: boolean;
 }

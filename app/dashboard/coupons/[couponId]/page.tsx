@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useCouponStore } from "../store/useCouponStore";
-import { useUserStore } from "@/app/dashboard/users/store/useUserStore";
 import { useStoreStore } from "@/app/dashboard/stores/store/useStoreStore";
 import { CouponService } from "../service/CouponService";
 
@@ -71,14 +70,11 @@ function InfoCard({ title, rows }: { title: string; rows: { label: string; value
 // ─── Edit form type ───────────────────────────────────────────────────────────
 
 type CouponEditForm = {
-  code: string;
   type: string;
   amount: string;
   expiryDate: string;
   notes: string;
-  usageLimit: string;
   storeId: string;
-  isUsed: boolean;
 };
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -87,7 +83,6 @@ export default function CouponDetailPage() {
   const { couponId } = useParams<{ couponId: string }>();
   const router = useRouter();
   const coupons = useCouponStore((s) => s.coupons);
-  const users = useUserStore((s) => s.users);
   const stores = useStoreStore((s) => s.stores);
 
   const coupon = coupons.find((c) => c.docId === couponId);
@@ -108,14 +103,11 @@ export default function CouponDetailPage() {
 
   function openEdit() {
     setForm({
-      code: coupon!.code ?? "",
       type: coupon!.type ?? "",
       amount: (coupon!.amount ?? "").toString(),
       expiryDate: firestoreTimestampToDateString(coupon!.expiryDate),
       notes: coupon!.notes ?? "",
-      usageLimit: (coupon!.usageLimit ?? "").toString(),
       storeId: coupon!.storeId ?? "",
-      isUsed: coupon!.isUsed ?? false,
     });
     setShowEdit(true);
   }
@@ -133,18 +125,14 @@ export default function CouponDetailPage() {
     if (!form || !coupon?.docId) return;
     const expiryDate = form.expiryDate ? new Date(form.expiryDate + "T00:00:00") : undefined;
     const amount = parseFloat(form.amount);
-    const usageLimit = parseInt(form.usageLimit);
     setLoading(true);
     try {
       await CouponService.updateCoupon(coupon.docId, {
-        code: form.code.trim() || undefined,
         type: form.type.trim() || undefined,
         amount: isNaN(amount) ? undefined : amount,
         expiryDate: expiryDate && !isNaN(expiryDate.getTime()) ? expiryDate : undefined,
         notes: form.notes.trim() || undefined,
-        usageLimit: isNaN(usageLimit) ? undefined : usageLimit,
         storeId: form.storeId.trim() || undefined,
-        isUsed: form.isUsed,
       });
       toast.success("Coupon updated.");
       closeEdit();
@@ -168,18 +156,6 @@ export default function CouponDetailPage() {
             ← Back to Coupons
           </button>
           <div className="flex items-center gap-3">
-            <h1 className="font-mono text-2xl font-semibold text-black">{coupon.code ?? "—"}</h1>
-            {coupon.isUsed ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-black px-2.5 py-1 text-xs font-medium text-white">
-                <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                Used
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-success">
-                <span className="h-1.5 w-1.5 rounded-full bg-success" />
-                Active
-              </span>
-            )}
           </div>
           <p className="mt-1 text-sm text-light-grey">{coupon.type ?? "No type"}</p>
         </div>
@@ -196,24 +172,12 @@ export default function CouponDetailPage() {
         <InfoCard
           title="Coupon Details"
           rows={[
-            { label: "Code", value: coupon.code ?? "—", mono: true },
             { label: "Type", value: coupon.type ?? "—" },
             { label: "Amount", value: `$${(coupon.amount ?? 0).toFixed(2)}` },
             { label: "Expiry Date", value: formatDate(coupon.expiryDate) },
-            { label: "Status", value: coupon.isUsed ? "Used" : "Active" },
-            { label: "Source", value: coupon.source ?? "—" },
-            { label: "Referral ID", value: coupon.referralId ?? "—", mono: true },
           ]}
         />
 
-        <InfoCard
-          title="Usage"
-          rows={[
-            { label: "Usage Count", value: (coupon.usageCount ?? 0).toString() },
-            { label: "Usage Limit", value: coupon.usageLimit?.toString() ?? "Unlimited" },
-            { label: "Progress", value: `${coupon.usageCount ?? 0} / ${coupon.usageLimit ?? "∞"}` },
-          ]}
-        />
 
         <InfoCard
           title="Store"
@@ -223,27 +187,6 @@ export default function CouponDetailPage() {
           ]}
         />
 
-        {/* Customers card — rendered manually for the list */}
-        <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
-          <div className="border-b border-border px-4 py-3">
-            <h2 className="font-semibold text-black">Customers</h2>
-          </div>
-          <div className="divide-y divide-border">
-            {!coupon.userIds || coupon.userIds.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-light-grey">No customers assigned.</p>
-            ) : (
-              coupon.userIds.map((uid) => {
-                const user = users.find((u) => u.docId === uid);
-                return (
-                  <div key={uid} className="px-4 py-3">
-                    <p className="text-sm text-black">{user?.email ?? "—"}</p>
-                    <p className="font-mono text-xs text-light-grey">{uid}</p>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
 
         <div className="lg:col-span-2">
           <InfoCard
@@ -274,14 +217,6 @@ export default function CouponDetailPage() {
             <div className="max-h-[72vh] space-y-4 overflow-y-auto px-6 py-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-xs text-light-grey">Code</label>
-                  <input
-                    className="w-full rounded-lg border border-border px-3 py-2 font-mono text-sm text-black outline-none focus:border-primary"
-                    value={form.code}
-                    onChange={(e) => setField("code", e.target.value)}
-                  />
-                </div>
-                <div>
                   <label className="mb-1.5 block text-xs text-light-grey">Type</label>
                   <input
                     className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
@@ -307,17 +242,6 @@ export default function CouponDetailPage() {
                     className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
                     value={form.expiryDate}
                     onChange={(e) => setField("expiryDate", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs text-light-grey">Usage Limit</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
-                    value={form.usageLimit}
-                    onChange={(e) => setField("usageLimit", e.target.value)}
                   />
                 </div>
                 <div>
@@ -347,28 +271,10 @@ export default function CouponDetailPage() {
               </div>
 
               <div>
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-light-grey">Flags</p>
-                <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-                  <label className="flex cursor-pointer items-center justify-between px-3 py-2.5 hover:bg-[#fafafa]">
-                    <span className="text-sm text-black">Is Used</span>
-                    <input
-                      type="checkbox"
-                      checked={form.isUsed}
-                      onChange={(e) => setField("isUsed", e.target.checked)}
-                      className="accent-primary"
-                    />
-                  </label>
-                </div>
-              </div>
-
-              <div>
                 <p className="mb-2 text-xs font-medium uppercase tracking-wide text-light-grey">Read-only</p>
                 <div className="space-y-2 rounded-lg border border-border bg-[#fafafa] px-3 py-2">
                   {[
                     { label: "Doc ID", value: coupon.docId ?? "—" },
-                    { label: "Usage Count", value: (coupon.usageCount ?? 0).toString() },
-                    { label: "Source", value: coupon.source ?? "—" },
-                    { label: "Referral ID", value: coupon.referralId ?? "—" },
                   ].map(({ label, value }) => (
                     <div key={label} className="flex items-center justify-between gap-4">
                       <span className="shrink-0 text-xs text-light-grey">{label}</span>

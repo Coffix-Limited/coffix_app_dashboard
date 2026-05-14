@@ -1,12 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useStaffStore } from "./store/useStaffStore";
 import { useStoreStore } from "@/app/dashboard/stores/store/useStoreStore";
 import { StaffService } from "./service/StaffService";
 import { Staff, StaffRole } from "./interface/staff";
 import { Store } from "@/app/dashboard/stores/interface/store";
+import {
+  STAFF_PROTECTED_FIELDS,
+  STAFF_IMPORTABLE_FIELDS,
+} from "./constants/staffFieldConstants";
+import { escapeCSV, tsToISO, parseCSVText, triggerCSVDownload } from "@/app/utils/csvUtils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 // ─── Form types ───────────────────────────────────────────────────────────────
 
@@ -309,6 +322,129 @@ export default function StaffsPage() {
     return result;
   }, [staffs, search, roleFilter, statusFilter, sortKey, sortDir]);
 
+  const [importLoading, setImportLoading] = useState(false);
+  const [importPreview, setImportPreview] = useState<{ validRows: Record<string, string>[]; errors: { row: number; field: string; reason: string }[] } | null>(null);
+  const [showImportInfo, setShowImportInfo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function exportToCSV() {
+    const headers = ["docId", "email", "createdAt", "role", "storeIds", "disabled", "firstName", "lastName"];
+    const rows = displayed.map((s) =>
+      [
+        escapeCSV(s.docId ?? ""),
+        escapeCSV(s.email),
+        escapeCSV(tsToISO(s.createdAt)),
+        escapeCSV(s.role),
+        escapeCSV((s.storeIds ?? []).filter(Boolean).join("|")),
+        String(s.disabled ?? false),
+        escapeCSV(s.firstName ?? ""),
+        escapeCSV(s.lastName ?? ""),
+      ].join(",")
+    );
+    triggerCSVDownload([headers.join(","), ...rows].join("\n"), `staffs-${new Date().toISOString().slice(0, 10)}.csv`);
+  }
+
+  function handleImportCSV(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const text = ev.target?.result as string;
+        const { headers, rows } = parseCSVText(text);
+
+        const protectedInFile = headers.filter((h) =>
+          (STAFF_PROTECTED_FIELDS as readonly string[]).includes(h)
+        );
+        if (protectedInFile.length > 0) {
+          toast.error(`CSV contains protected columns: ${protectedInFile.join(", ")}. Remove them and re-upload.`);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+          return;
+        }
+
+        const existingStaffIds = useStaffStore.getState().staffs.map((s) => s.docId!);
+        const storeIds = useStoreStore.getState().stores.map((s) => s.docId!);
+        const validImportCols = new Set([...(STAFF_IMPORTABLE_FIELDS as readonly string[]), "docId"]);
+
+        const validRows: Record<string, string>[] = [];
+        const errors: { row: number; field: string; reason: string }[] = [];
+
+        rows.forEach((cols, idx) => {
+          const rowNum = idx + 2;
+          const row: Record<string, string> = {};
+          headers.forEach((h, i) => { row[h] = cols[i] ?? ""; });
+
+          headers.filter((h) => !validImportCols.has(h)).forEach((col) =>
+            errors.push({ row: rowNum, field: col, reason: `Unknown column "${col}" will be ignored` })
+          );
+
+          let hasError = false;
+
+          if (!row.docId) {
+            errors.push({ row: rowNum, field: "docId", reason: "docId is required to identify the staff member" });
+            hasError = true;
+          } else if (!existingStaffIds.includes(row.docId)) {
+            errors.push({ row: rowNum, field: "docId", reason: "Staff not found — cannot update" });
+            hasError = true;
+          }
+
+          if (row.role && !["admin", "store_manager"].includes(row.role)) {
+            errors.push({ row: rowNum, field: "role", reason: 'Must be "admin" or "store_manager"' });
+            hasError = true;
+          }
+
+          if (row.storeIds) {
+            const ids = row.storeIds.split("|").filter(Boolean);
+            const invalid = ids.filter((id) => !storeIds.includes(id));
+            if (invalid.length > 0) {
+              errors.push({ row: rowNum, field: "storeIds", reason: `Store(s) not found: ${invalid.join(", ")}` });
+              hasError = true;
+            }
+          }
+
+          if (row.disabled !== undefined && row.disabled !== "" &&
+            !["true", "false"].includes(row.disabled.toLowerCase())) {
+            errors.push({ row: rowNum, field: "disabled", reason: 'Must be "true" or "false"' });
+            hasError = true;
+          }
+
+          if (!hasError) validRows.push(row);
+        });
+
+        setImportPreview({ validRows, errors });
+      } catch {
+        toast.error("Failed to read CSV file.");
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  async function handleConfirmImport() {
+    if (!importPreview || importPreview.validRows.length === 0) return;
+    setImportLoading(true);
+    try {
+      let count = 0;
+      for (const row of importPreview.validRows) {
+        const update: Partial<Omit<Staff, "docId">> = {};
+        if (row.role) update.role = row.role as StaffRole;
+        if (row.storeIds !== undefined) update.storeIds = row.storeIds ? row.storeIds.split("|").filter(Boolean) : [];
+        if (row.disabled !== undefined && row.disabled !== "") update.disabled = row.disabled.toLowerCase() === "true";
+        if (row.firstName !== undefined) update.firstName = row.firstName;
+        if (row.lastName !== undefined) update.lastName = row.lastName;
+        await StaffService.updateStaff(row.docId, update);
+        count++;
+      }
+      toast.success(`Updated ${count} staff member(s).`);
+      setImportPreview(null);
+    } catch {
+      toast.error("Failed to import staff.");
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
   // Create dialog state
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState<StaffForm>(emptyForm);
@@ -441,12 +577,37 @@ export default function StaffsPage() {
             {staffs.length} staff member{staffs.length !== 1 ? "s" : ""} total
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
-        >
-          + New Staff
-        </button>
+        <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleImportCSV}
+            className="hidden"
+          />
+{/* <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowImportInfo(true)}
+            disabled={importLoading}
+          >
+            {importLoading ? "Importing…" : "Import CSV"}
+          </Button> */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportToCSV}
+            disabled={displayed.length === 0}
+          >
+            Export CSV
+          </Button>
+          <button
+            onClick={openCreate}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
+          >
+            + New Staff
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -644,6 +805,74 @@ export default function StaffsPage() {
           }}
         />
       )}
+
+      {/* CSV Field Guide Dialog */}
+      <Dialog open={showImportInfo} onOpenChange={setShowImportInfo}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>CSV Import Guide — Staff</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2 text-sm">
+            <div className="space-y-1.5">
+              <p className="font-medium text-black">Editable fields</p>
+              <div className="flex flex-wrap gap-1.5">
+                {(["role", "storeIds", "disabled", "firstName", "lastName"] as const).map((f) => (
+                  <span key={f} className="rounded-md bg-background border border-border px-2 py-0.5 text-xs text-black font-mono">{f}</span>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <p className="font-medium text-black">Required fields <span className="text-xs font-normal text-light-grey">(for new rows)</span></p>
+              <p className="text-xs text-light-grey">None — every row must include an existing <span className="font-mono text-black">docId</span>.</p>
+            </div>
+            <p className="text-xs text-light-grey leading-relaxed">
+              This entity is <span className="font-medium text-black">update-only</span>. Every row must include a valid <span className="font-mono text-black">docId</span>. The <span className="font-mono text-black">storeIds</span> field uses <span className="font-mono text-black">|</span> as separator. The <span className="font-mono text-black">role</span> field accepts <span className="font-mono text-black">admin</span> or <span className="font-mono text-black">store_manager</span>.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImportInfo(false)}>Cancel</Button>
+            <Button onClick={() => { setShowImportInfo(false); fileInputRef.current?.click(); }}>
+              Choose File →
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Preview Dialog */}
+      <Dialog open={importPreview !== null} onOpenChange={() => setImportPreview(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Import Preview</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {importPreview && importPreview.errors.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-black">Errors</p>
+                <div className="max-h-48 overflow-y-auto rounded-lg border border-border bg-background p-3 space-y-1">
+                  {importPreview.errors.map((e, i) => (
+                    <p key={i} className="text-xs text-black">
+                      <span className="font-medium">Row {e.row}</span> — {e.field}: {e.reason}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="text-sm text-black">
+              <span className="font-medium">{importPreview?.validRows.length ?? 0}</span> row(s) will be updated.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportPreview(null)} disabled={importLoading}>
+              Cancel
+            </Button>
+            {(importPreview?.validRows.length ?? 0) > 0 && (
+              <Button onClick={handleConfirmImport} disabled={importLoading}>
+                {importLoading ? "Updating…" : `Update ${importPreview?.validRows.length} row(s)`}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
