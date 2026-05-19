@@ -547,20 +547,6 @@ export default function ProductsPage() {
     }
   }
 
-  function exportToCSV() {
-    downloadCSV("products", ["docId", "name", "price", "cost", "order", "categoryId", "modifierGroupIds", "availableToStores", "disabled"], products.map((p) => [
-      escapeCSV(p.docId ?? ""),
-      escapeCSV(p.name ?? ""),
-      p.price ?? "",
-      p.cost ?? "",
-      p.order ?? "",
-      escapeCSV(p.categoryId ?? ""),
-      escapeCSV((p.modifierGroupIds ?? []).join("|")),
-      escapeCSV((p.availableToStores ?? []).join("|")),
-      p.disabled ?? false,
-    ]));
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -588,14 +574,12 @@ export default function ProductsPage() {
           </Button> */}
           <Button
             variant="outline"
-            size="sm"
             onClick={exportToCSV}
             disabled={filtered.length === 0}
           >
             Export CSV
           </Button>
           <Button
-            size="sm"
           onClick={() => setShowCreate(true)}>+ New Product</Button>
         </div>
       </div>

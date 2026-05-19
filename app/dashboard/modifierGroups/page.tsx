@@ -139,12 +139,12 @@ export default function ModifierGroupsPage() {
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={exportToCSV}>Export CSV</Button>
-                    <button
+                    <Button
                         onClick={() => setShowCreate(true)}
                         className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
                     >
                         + New Group
-                    </button>
+                    </Button>
                 </div>
             </div>
 

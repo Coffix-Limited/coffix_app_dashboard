@@ -21,7 +21,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { StoresFilterBar } from "./components/StoresFilterBar";
-import { escapeCSV, downloadCSV } from "@/app/utils/csv";
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
 type Day = typeof DAYS[number];
@@ -342,18 +341,6 @@ export default function StoresPage() {
     }
   }
 
-  function exportToCSV() {
-    downloadCSV("stores", ["docId", "name", "email", "contactNumber", "location", "address", "disabled"], stores.map((s) => [
-      escapeCSV(s.docId ?? ""),
-      escapeCSV(s.name ?? ""),
-      escapeCSV(s.email ?? ""),
-      escapeCSV(s.contactNumber ?? ""),
-      escapeCSV(s.location ?? ""),
-      escapeCSV(s.address ?? ""),
-      s.disabled ?? false,
-    ]));
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -381,14 +368,12 @@ export default function StoresPage() {
           </Button> */}
           <Button
             variant="outline"
-            size="sm"
             onClick={exportToCSV}
             disabled={displayed.length === 0}
           >
             Export CSV
           </Button>
           <Button
-            size="sm"
             onClick={() => setShowCreate(true)}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
           >

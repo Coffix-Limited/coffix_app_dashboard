@@ -6,7 +6,7 @@ import { useTransactionStore } from "./store/useTransactionStore";
 import { useUserStore } from "@/app/dashboard/users/store/useUserStore";
 import { Transaction, PaymentMethod } from "./interface/transaction";
 import { formatDateTime } from "@/app/utils/formatting";
-import { escapeCSV, triggerCSVDownload } from "@/app/utils/csvUtils";
+import { escapeCSV, tsToISO, triggerCSVDownload } from "@/app/utils/csvUtils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/app/lib/AuthContext";
 import { toast } from "sonner";
@@ -31,8 +31,6 @@ function dateInRange(value: Date | undefined, from: string, to: string): boolean
   }
   return true;
 }
-import { Button } from "@/components/ui/button";
-import { escapeCSV, tsToISO, downloadCSV } from "@/app/utils/csv";
 
 function PaymentMethodBadge({ method }: { method: PaymentMethod | null | undefined }) {
   if (!method) return <span className="text-black">—</span>;
@@ -259,18 +257,6 @@ export default function TransactionsPage() {
     triggerCSVDownload([headers.join(","), ...rows].join("\n"), `transactions-${new Date().toISOString().slice(0, 10)}.csv`);
   }
 
-  function exportToCSV() {
-    downloadCSV("transactions", ["docId", "transactionNumber", "createdAt", "type", "paymentMethod", "customerEmail", "amount"], transactions.map((tx) => [
-      escapeCSV(tx.docId ?? ""),
-      escapeCSV(tx.transactionNumber ?? ""),
-      tsToISO(tx.createdAt),
-      escapeCSV(tx.type ?? ""),
-      escapeCSV(tx.paymentMethod ?? ""),
-      escapeCSV(getCustomerEmail(tx)),
-      tx.amount ?? "",
-    ]));
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -280,14 +266,13 @@ export default function TransactionsPage() {
             {transactions.length} transaction{transactions.length !== 1 ? "s" : ""} total
           </p>
         </div>
-        <Button variant="outline"  onClick={exportToCSV}>Export CSV</Button>
         <div className="flex items-center gap-2">
           {selected.size > 0 && (
             <Button size="sm" variant="outline" onClick={sendInvoices} disabled={invoicing}>
               {invoicing ? "Sending…" : `Send Invoice (${selected.size})`}
             </Button>
           )}
-          <Button size="sm" onClick={exportToCSV}>
+          <Button variant="outline" onClick={exportToCSV} disabled={displayed.length === 0}>
             Export CSV
           </Button>
         </div>

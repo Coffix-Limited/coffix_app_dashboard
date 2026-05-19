@@ -20,8 +20,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Button } from "@/components/ui/button";
-import { escapeCSV, downloadCSV } from "@/app/utils/csv";
 
 // ─── Form types ───────────────────────────────────────────────────────────────
 
@@ -569,18 +567,6 @@ export default function StaffsPage() {
       .join(", ");
   }
 
-  function exportToCSV() {
-    downloadCSV("staffs", ["docId", "firstName", "lastName", "email", "role", "storeIds", "disabled"], staffs.map((s) => [
-      escapeCSV(s.docId ?? ""),
-      escapeCSV(s.firstName ?? ""),
-      escapeCSV(s.lastName ?? ""),
-      escapeCSV(s.email ?? ""),
-      escapeCSV(s.role ?? ""),
-      escapeCSV((s.storeIds ?? []).join("|")),
-      s.disabled ?? false,
-    ]));
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -607,22 +593,14 @@ export default function StaffsPage() {
           >
             {importLoading ? "Importing…" : "Import CSV"}
           </Button> */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={exportToCSV}
-            disabled={displayed.length === 0}
-          >
-            Export CSV
-          </Button>
           <div className="flex gap-2">
           <Button variant="outline"  onClick={exportToCSV}>Export CSV</Button>
-          <button
+          <Button
               onClick={openCreate}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
             >
               + New Staff
-            </button>
+            </Button>
         </div>
         </div>
       </div>

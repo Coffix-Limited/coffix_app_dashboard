@@ -74,7 +74,7 @@ export default function LogsPage() {
             {logs.length} log{logs.length !== 1 ? "s" : ""} total
           </p>
         </div>
-        <Button size="sm" onClick={exportToCSV} disabled={displayed.length === 0}>
+        <Button variant="outline" onClick={exportToCSV} disabled={displayed.length === 0}>
           Export CSV
         </Button>
       </div>

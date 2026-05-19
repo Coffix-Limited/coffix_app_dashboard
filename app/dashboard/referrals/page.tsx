@@ -21,7 +21,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { escapeCSV, downloadCSV } from "@/app/utils/csv";
 
 type StatusFilter = "All" | "Active" | "Disabled";
 type SortKey = "referralTime" | "referrer" | "referee";
@@ -222,6 +221,7 @@ export default function ReferralsPage() {
           </Button> */}
           <Button
               onClick={exportToCSV}
+              variant="outline"
             disabled={filtered.length === 0}
           >
             Export CSV
