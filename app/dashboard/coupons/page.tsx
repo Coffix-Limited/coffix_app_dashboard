@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { CouponsFilterBar } from "./components/CouponsFilterBar";
+import { AddCouponDialog } from "./components/AddCouponDialog";
 import { formatDateTime } from "@/app/utils/formatting";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -82,12 +83,33 @@ export default function CouponsPage() {
   const router = useRouter();
 
   const [search, setSearch] = useState("");
-  // const [typeFilter, setTypeFilter] = useState("All");
+  const [typeFilter, setTypeFilter] = useState("All");
+  const [storeFilter, setStoreFilter] = useState("");
+  const [emailFilter, setEmailFilter] = useState("");
+  const [expiryFrom, setExpiryFrom] = useState("");
+  const [expiryTo, setExpiryTo] = useState("");
+  const [amountMin, setAmountMin] = useState("");
+  const [amountMax, setAmountMax] = useState("");
 
-  const anyFilterActive = search.trim() !== "";
+  const anyFilterActive =
+    search.trim() !== "" ||
+    typeFilter !== "All" ||
+    storeFilter !== "" ||
+    emailFilter.trim() !== "" ||
+    expiryFrom !== "" ||
+    expiryTo !== "" ||
+    amountMin !== "" ||
+    amountMax !== "";
 
   function clearAllFilters() {
     setSearch("");
+    setTypeFilter("All");
+    setStoreFilter("");
+    setEmailFilter("");
+    setExpiryFrom("");
+    setExpiryTo("");
+    setAmountMin("");
+    setAmountMax("");
   }
 
   const [sortKey, setSortKey] = useState<CouponSortKey>("createdAt");
@@ -98,6 +120,9 @@ export default function CouponsPage() {
   const [bulkExpiry, setBulkExpiry] = useState("");
   const [bulkAmount, setBulkAmount] = useState("");
   const [bulkLoading, setBulkLoading] = useState(false);
+
+  const [showCreate, setShowCreate] = useState(false);
+
   const [importLoading, setImportLoading] = useState(false);
   const [importPreview, setImportPreview] = useState<ImportPreview>(null);
   const [showImportInfo, setShowImportInfo] = useState(false);
@@ -117,10 +142,14 @@ export default function CouponsPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     let result = coupons.filter((c) => {
-      if (q) {
-        const notes = (c.notes ?? "").toLowerCase();
-        if (!notes.includes(q)) return false;
-      }
+      if (q && !(c.notes ?? "").toLowerCase().includes(q)) return false;
+      if (typeFilter !== "All" && c.type !== typeFilter) return false;
+      if (storeFilter && c.storeId !== storeFilter) return false;
+      if (emailFilter.trim() && !(c.customerEmail ?? "").toLowerCase().includes(emailFilter.trim().toLowerCase())) return false;
+      if (expiryFrom && firestoreToMs(c.expiryDate) < new Date(expiryFrom + "T00:00:00").getTime()) return false;
+      if (expiryTo && firestoreToMs(c.expiryDate) > new Date(expiryTo + "T23:59:59").getTime()) return false;
+      if (amountMin && (c.amount ?? 0) < parseFloat(amountMin)) return false;
+      if (amountMax && (c.amount ?? 0) > parseFloat(amountMax)) return false;
       return true;
     });
     result = [...result].sort((a, b) => {
@@ -135,7 +164,7 @@ export default function CouponsPage() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return result;
-  }, [coupons, search, sortKey, sortDir]);
+  }, [coupons, search, typeFilter, storeFilter, emailFilter, expiryFrom, expiryTo, amountMin, amountMax, sortKey, sortDir]);
 
   const allSelected = filtered.length > 0 && filtered.every((c) => selectedIds.has(c.docId!));
   const someSelected = !allSelected && filtered.some((c) => selectedIds.has(c.docId!));
@@ -360,15 +389,27 @@ export default function CouponsPage() {
           >
             {importLoading ? "Importing…" : "Import CSV"}
           </Button> */}
-          <Button variant="outline" onClick={exportToCSV} disabled={filtered.length === 0}>
+           <Button variant="outline" onClick={exportToCSV} disabled={filtered.length === 0}>
             Export CSV
           </Button>
+          <Button onClick={() => setShowCreate(true)}>
+            New Coupon
+          </Button>
+         
         </div>
       </div>
 
       {/* Filters */}
       <CouponsFilterBar
         search={search} setSearch={setSearch}
+        typeFilter={typeFilter} setTypeFilter={setTypeFilter}
+        storeFilter={storeFilter} setStoreFilter={setStoreFilter}
+        emailFilter={emailFilter} setEmailFilter={setEmailFilter}
+        expiryFrom={expiryFrom} setExpiryFrom={setExpiryFrom}
+        expiryTo={expiryTo} setExpiryTo={setExpiryTo}
+        amountMin={amountMin} setAmountMin={setAmountMin}
+        amountMax={amountMax} setAmountMax={setAmountMax}
+        stores={stores}
         anyFilterActive={anyFilterActive}
         clearAllFilters={clearAllFilters}
       />
@@ -417,8 +458,6 @@ export default function CouponsPage() {
               >
                 Expiry {sortKey === "expiryDate" ? (sortDir === "asc" ? "↑" : "↓") : <span className="opacity-30">↕</span>}
               </th>
-              <th className="px-5 py-3 text-left font-medium text-light-grey">Customer</th>
-              <th className="px-5 py-3 text-left font-medium text-light-grey">Store</th>
               <th className="px-5 py-3 text-left font-medium text-light-grey">Notes</th>
               <th
                 onClick={() => toggleSort("createdAt")}
@@ -462,8 +501,6 @@ export default function CouponsPage() {
                       ${(coupon.amount ?? 0).toFixed(2)}
                     </td>
                     <td className="px-5 py-3 text-black">{formatDateTime(coupon.expiryDate)}</td>
-                    <td className="px-5 py-3 text-black">{coupon.customerEmail ?? "—"}</td>
-                    <td className="px-5 py-3 text-black">{storeName}</td>
                     <td className="max-w-[200px] truncate px-5 py-3 text-black" title={coupon.notes ?? ""}>
                       {coupon.notes ?? "—"}
                     </td>
@@ -639,6 +676,12 @@ export default function CouponsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AddCouponDialog
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        stores={stores}
+      />
 
     </div>
   );

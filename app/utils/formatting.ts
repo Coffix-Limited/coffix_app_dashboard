@@ -66,5 +66,5 @@ export const formatDateTime = (value: unknown): string => {
   const minutes = String(date.getMinutes()).padStart(2, "0");
   const ampm = hours >= 12 ? "PM" : "AM";
   const hour12 = String(hours % 12 || 12).padStart(2, "0");
-  return `${day}/${month}/${year} ${hour12}:${minutes} ${ampm}`;
+  return `${day}-${month}-${year} ${hour12}:${minutes} ${ampm}`;
 };

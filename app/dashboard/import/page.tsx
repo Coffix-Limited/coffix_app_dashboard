@@ -119,7 +119,6 @@ export default function ImportPage() {
 
       {/* Collection selector */}
       <div className="space-y-2">
-        <label className="text-sm font-medium">Collection</label>
         <div className="flex flex-wrap gap-2">
           {COLLECTIONS.map((col) => (
             <button

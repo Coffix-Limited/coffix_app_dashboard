@@ -22,4 +22,7 @@ export interface AppUser {
   fcmToken?: string;
   appVersion?: string;
   creditExpiry?: Date;
+  scheduleOrder?: boolean;
+  shareCredit?: boolean;
+  withdrawBalance?: boolean;
 }

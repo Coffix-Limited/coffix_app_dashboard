@@ -84,7 +84,6 @@ export function TransactionsFilterBar({
               <SelectItem value="All">All Methods</SelectItem>
               <SelectItem value="coffixCredit">Coffix Credit</SelectItem>
               <SelectItem value="card">Credit Card</SelectItem>
-              <SelectItem value="wallet">Wallet</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -141,23 +140,6 @@ export function TransactionsFilterBar({
             <span className="shrink-0 text-xs text-light-grey">–</span>
             <input type="number" min="0" step="0.01" placeholder="Max" value={filterAmount.max}
               onChange={(e) => setFilterAmount((p) => ({ ...p, max: e.target.value }))}
-              className="h-7 w-full bg-transparent text-sm text-black outline-none placeholder:text-light-grey" />
-          </div>
-        </div>
-
-        {/* Total Amount */}
-        <div className={`flex flex-col gap-1 rounded-lg border bg-white px-3 py-1.5 min-w-[200px] ${filterTotalAmount.min || filterTotalAmount.max ? "border-primary" : "border-border"}`}>
-          <span className="flex items-center justify-between text-[10px] font-medium uppercase tracking-wide text-light-grey">
-            Total ($)
-            {(filterTotalAmount.min || filterTotalAmount.max) && <button onClick={() => setFilterTotalAmount({ min: "", max: "" })} className="ml-1 text-light-grey hover:text-black">×</button>}
-          </span>
-          <div className="flex items-center gap-1">
-            <input type="number" min="0" step="0.01" placeholder="Min" value={filterTotalAmount.min}
-              onChange={(e) => setFilterTotalAmount((p) => ({ ...p, min: e.target.value }))}
-              className="h-7 w-full bg-transparent text-sm text-black outline-none placeholder:text-light-grey" />
-            <span className="shrink-0 text-xs text-light-grey">–</span>
-            <input type="number" min="0" step="0.01" placeholder="Max" value={filterTotalAmount.max}
-              onChange={(e) => setFilterTotalAmount((p) => ({ ...p, max: e.target.value }))}
               className="h-7 w-full bg-transparent text-sm text-black outline-none placeholder:text-light-grey" />
           </div>
         </div>

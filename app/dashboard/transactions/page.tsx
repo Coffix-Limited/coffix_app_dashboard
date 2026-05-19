@@ -34,16 +34,15 @@ function dateInRange(value: Date | undefined, from: string, to: string): boolean
 
 function PaymentMethodBadge({ method }: { method: PaymentMethod | null | undefined }) {
   if (!method) return <span className="text-black">—</span>;
-  const styles: Record<PaymentMethod, string> = {
+  const styles: Partial<Record<PaymentMethod, string>> = {
     coffixCredit: "bg-primary text-white",
     card: "bg-black text-white",
-    wallet: "border border-border text-black",
   };
-  const labels: Record<PaymentMethod, string> = {
+  const labels: Partial<Record<PaymentMethod, string>> = {
     coffixCredit: "Coffix Credit",
     card: "Credit Card",
-    wallet: "Wallet",
   };
+  if (!styles[method] || !labels[method]) return <span className="text-black">—</span>;
   return (
     <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${styles[method]}`}>
       {labels[method]}
@@ -322,13 +321,14 @@ export default function TransactionsPage() {
                 Payment Method
               </th>
               <th className="px-5 py-3 text-left font-medium text-light-grey">Type</th>
+              <th className="px-5 py-3 text-left font-medium text-light-grey">Amount</th>
               <th className="px-5 py-3 text-left font-medium text-light-grey">Customer</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {displayed.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-light-grey">
+                <td colSpan={7} className="px-5 py-10 text-center text-light-grey">
                   No transactions found.
                 </td>
               </tr>
@@ -355,6 +355,9 @@ export default function TransactionsPage() {
                     <PaymentMethodBadge method={tx.paymentMethod} />
                   </td>
                   <td className="px-5 py-3 text-black">{tx.type ?? "—"}</td>
+                  <td className="px-5 py-3 text-black">
+                    {tx.amount != null ? `$${tx.amount.toFixed(2)}` : "—"}
+                  </td>
                   <td className="px-5 py-3 text-black">{getCustomerEmail(tx)}</td>
                 </tr>
               ))

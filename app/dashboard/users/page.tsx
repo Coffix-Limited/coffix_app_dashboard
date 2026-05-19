@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { UsersFilterBar } from "./components/UsersFilterBar";
+import { AddCouponDialog } from "@/app/dashboard/coupons/components/AddCouponDialog";
 
 function dateInRange(value: Date | undefined, from: string, to: string): boolean {
   if (!from && !to) return true;
@@ -119,6 +120,7 @@ export default function UsersPage() {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showAddCredits, setShowAddCredits] = useState(false);
+  const [showAddCoupon, setShowAddCoupon] = useState(false);
   const [creditAmount, setCreditAmount] = useState("");
   const [creditLoading, setCreditLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
@@ -492,6 +494,12 @@ export default function UsersPage() {
           </Button>
           <Button
             size="sm"
+            onClick={() => setShowAddCoupon(true)}
+          >
+            Add Coupon
+          </Button>
+          <Button
+            size="sm"
             variant="ghost"
             onClick={clearSelection}
           >
@@ -672,6 +680,13 @@ export default function UsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AddCouponDialog
+        open={showAddCoupon}
+        onClose={() => setShowAddCoupon(false)}
+        stores={stores}
+        defaultEmail={selectedIds.size === 1 ? users.find((u) => u.docId === Array.from(selectedIds)[0])?.email : undefined}
+      />
     </div>
   );
 }

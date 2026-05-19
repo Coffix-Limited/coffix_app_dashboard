@@ -6,26 +6,10 @@ import { toast } from "sonner";
 import { useCouponStore } from "../store/useCouponStore";
 import { useStoreStore } from "@/app/dashboard/stores/store/useStoreStore";
 import { CouponService } from "../service/CouponService";
+import { Coupon } from "../interface/coupon";
+import { formatDate, formatDateTime } from "@/app/utils/formatting";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatDate(value: unknown): string {
-  if (!value) return "—";
-  if (value instanceof Date) return value.toLocaleDateString();
-  if (typeof value === "object" && value !== null && "seconds" in value) {
-    return new Date((value as { seconds: number }).seconds * 1000).toLocaleDateString();
-  }
-  return "—";
-}
-
-function formatDateTime(value: unknown): string {
-  if (!value) return "—";
-  if (value instanceof Date) return value.toLocaleString();
-  if (typeof value === "object" && value !== null && "seconds" in value) {
-    return new Date((value as { seconds: number }).seconds * 1000).toLocaleString();
-  }
-  return "—";
-}
 
 function firestoreTimestampToDateString(value: unknown): string {
   if (!value) return "";
@@ -103,9 +87,9 @@ export default function CouponDetailPage() {
 
   function openEdit() {
     setForm({
-      type: coupon!.type ?? "",
+      type: ["referral", "admin"].includes(coupon!.type ?? "") ? coupon!.type! : "referral",
       amount: (coupon!.amount ?? "").toString(),
-      expiryDate: firestoreTimestampToDateString(coupon!.expiryDate),
+      expiryDate: formatDate(coupon!.expiryDate),
       notes: coupon!.notes ?? "",
       storeId: coupon!.storeId ?? "",
     });
@@ -123,17 +107,19 @@ export default function CouponDetailPage() {
 
   async function handleSave() {
     if (!form || !coupon?.docId) return;
-    const expiryDate = form.expiryDate ? new Date(form.expiryDate + "T00:00:00") : undefined;
-    const amount = parseFloat(form.amount);
     setLoading(true);
     try {
-      await CouponService.updateCoupon(coupon.docId, {
-        type: form.type.trim() || undefined,
-        amount: isNaN(amount) ? undefined : amount,
-        expiryDate: expiryDate && !isNaN(expiryDate.getTime()) ? expiryDate : undefined,
-        notes: form.notes.trim() || undefined,
-        storeId: form.storeId.trim() || undefined,
-      });
+      const data: Partial<Omit<Coupon, "docId">> = {};
+      if (form.type.trim()) data.type = form.type.trim();
+      const amount = parseFloat(form.amount);
+      if (!isNaN(amount) && amount >= 0) data.amount = amount;
+      if (form.expiryDate) {
+        const d = new Date(form.expiryDate + "T00:00:00");
+        if (!isNaN(d.getTime())) data.expiryDate = d;
+      }
+      if (form.notes.trim()) data.notes = form.notes.trim();
+      if (form.storeId.trim()) data.storeId = form.storeId.trim();
+      await CouponService.updateCoupon(coupon.docId, data);
       toast.success("Coupon updated.");
       closeEdit();
     } catch {
@@ -174,7 +160,7 @@ export default function CouponDetailPage() {
           rows={[
             { label: "Type", value: coupon.type ?? "—" },
             { label: "Amount", value: `$${(coupon.amount ?? 0).toFixed(2)}` },
-            { label: "Expiry Date", value: formatDate(coupon.expiryDate) },
+            { label: "Expiry Date", value: formatDateTime(coupon.expiryDate) },
           ]}
         />
 
@@ -218,11 +204,14 @@ export default function CouponDetailPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1.5 block text-xs text-light-grey">Type</label>
-                  <input
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
+                  <select
+                    className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-black outline-none focus:border-primary"
                     value={form.type}
                     onChange={(e) => setField("type", e.target.value)}
-                  />
+                  >
+                    <option value="referral">Referral</option>
+                    <option value="admin">Admin</option>
+                  </select>
                 </div>
                 <div>
                   <label className="mb-1.5 block text-xs text-light-grey">Amount ($)</label>
@@ -270,19 +259,6 @@ export default function CouponDetailPage() {
                 </div>
               </div>
 
-              <div>
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-light-grey">Read-only</p>
-                <div className="space-y-2 rounded-lg border border-border bg-[#fafafa] px-3 py-2">
-                  {[
-                    { label: "Doc ID", value: coupon.docId ?? "—" },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="flex items-center justify-between gap-4">
-                      <span className="shrink-0 text-xs text-light-grey">{label}</span>
-                      <span className="truncate font-mono text-xs text-black" title={value}>{value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
 
             <div className="flex justify-end gap-2 border-t border-border px-6 py-4">

@@ -33,6 +33,7 @@ type FormState = {
   minCreditToShare: string;
   minTopUp: string;
   referralExpiryDays: string;
+  aboutUrl: string;
   specialUrl: string;
   storeUrl: string;
   tcUrl: string;
@@ -55,6 +56,7 @@ function settingsToForm(s: GlobalSettings): FormState {
     minCreditToShare: s.minCreditToShare?.toString() ?? "",
     minTopUp: s.minTopUp?.toString() ?? "",
     referralExpiryDays: s.referralExpiryDays?.toString() ?? "",
+    aboutUrl: s.aboutUrl ?? "",
     specialUrl: s.specialUrl ?? "",
     storeUrl: s.storeUrl ?? "",
     tcUrl: s.tcUrl ?? "",
@@ -76,7 +78,7 @@ const NUMERIC_NON_NEGATIVE: (keyof FormState)[] = [
 ];
 const NUMERIC_INTEGER: (keyof FormState)[] = ["creditExpiryDuration", "referralExpiryDays", "couponExpiryDays"];
 const NUMERIC_POSITIVE: (keyof FormState)[] = ["minCreditToShare", "minTopUp", "couponDefaultAmount"];
-const URL_FIELDS: (keyof FormState)[] = ["specialUrl", "storeUrl", "tcUrl"];
+const URL_FIELDS: (keyof FormState)[] = ["aboutUrl", "specialUrl", "storeUrl", "tcUrl"];
 
 const FIELD_LABELS: Record<keyof FormState, string> = {
   GST: "GST",
@@ -91,6 +93,7 @@ const FIELD_LABELS: Record<keyof FormState, string> = {
   minCreditToShare: "Min Credit to Share",
   minTopUp: "Min Top Up",
   referralExpiryDays: "Referral Expiry Days",
+  aboutUrl: "About URL",
   specialUrl: "Special URL",
   storeUrl: "Store URL",
   tcUrl: "T&C URL",
@@ -297,6 +300,7 @@ const emptyForm: FormState = {
   minCreditToShare: "",
   minTopUp: "",
   referralExpiryDays: "",
+  aboutUrl: "",
   specialUrl: "",
   storeUrl: "",
   tcUrl: "",
@@ -309,39 +313,17 @@ export default function GlobalSettingsPage() {
   const settings = useGlobalSettingsStore((s) => s.settings);
 
   const [form, setForm] = useState<FormState>(emptyForm);
-  const [toggles, setToggles] = useState({
-    scheduleOrder: false,
-    shareCredit: false,
-    withdrawBalance: false,
-  });
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   useEffect(() => {
     if (settings) {
       setForm(settingsToForm(settings));
-      setToggles({
-        scheduleOrder: settings.scheduleOrder ?? false,
-        shareCredit: settings.shareCredit ?? false,
-        withdrawBalance: settings.withdrawBalance ?? false,
-      });
     }
   }, [settings]);
 
   function setField(field: keyof FormState) {
     return (v: string) => setForm((f) => ({ ...f, [field]: v }));
-  }
-
-  async function handleToggle(field: keyof typeof toggles, value: boolean) {
-    setToggles((t) => ({ ...t, [field]: value }));
-    try {
-      await GlobalSettingsService.updateSettings({ [field]: value });
-      toast.success("Setting updated.");
-    } catch (err) {
-      console.error(err);
-      setToggles((t) => ({ ...t, [field]: !value }));
-      toast.error("Failed to update setting.");
-    }
   }
 
   async function handleSave() {
@@ -353,7 +335,7 @@ export default function GlobalSettingsPage() {
 
     setLoading(true);
     try {
-      await GlobalSettingsService.updateSettings({ ...formToPayload(form), ...toggles });
+      await GlobalSettingsService.updateSettings(formToPayload(form));
       toast.success("Settings saved.");
     } catch (err) {
       console.error(err);
@@ -535,6 +517,13 @@ export default function GlobalSettingsPage() {
 
         <Section title="URLs">
           <Field
+            label="About URL"
+            type="text"
+            value={form.aboutUrl}
+            onChange={setField("aboutUrl")}
+            placeholder="https://..."
+          />
+          <Field
             label="Special URL"
             type="text"
             value={form.specialUrl}
@@ -557,26 +546,6 @@ export default function GlobalSettingsPage() {
           />
         </Section>
 
-        <Section title="Feature Flags">
-          <ToggleField
-            label="Schedule Order"
-            description="Allow customers to place orders for a future time"
-            checked={toggles.scheduleOrder}
-            onChange={(v) => handleToggle("scheduleOrder", v)}
-          />
-          <ToggleField
-            label="Share Credit"
-            description="Allow customers to gift Coffix Credit to others"
-            checked={toggles.shareCredit}
-            onChange={(v) => handleToggle("shareCredit", v)}
-          />
-          <ToggleField
-            label="Withdraw Balance"
-            description="Allow customers to withdraw their Coffix Credit balance"
-            checked={toggles.withdrawBalance}
-            onChange={(v) => handleToggle("withdrawBalance", v)}
-          />
-        </Section>
       </div>
 
       {/* Validation error dialog */}

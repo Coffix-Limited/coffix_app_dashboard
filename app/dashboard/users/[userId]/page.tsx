@@ -75,6 +75,9 @@ type UserEditForm = {
   allowWinACoffee: boolean;
   disabled: boolean;
   emailVerified: boolean;
+  scheduleOrder: boolean;
+  shareCredit: boolean;
+  withdrawBalance: boolean;
 };
 
 type DialogMode = "edit-user" | null;
@@ -99,6 +102,9 @@ function userToForm(user: AppUser): UserEditForm {
     allowWinACoffee: user.allowWinACoffee ?? false,
     disabled: user.disabled ?? false,
     emailVerified: user.emailVerified ?? false,
+    scheduleOrder: user.scheduleOrder ?? false,
+    shareCredit: user.shareCredit ?? false,
+    withdrawBalance: user.withdrawBalance ?? false,
   };
 }
 
@@ -191,6 +197,9 @@ export default function UserDetailPage() {
         allowWinACoffee: form.allowWinACoffee,
         disabled: form.disabled,
         emailVerified: form.emailVerified,
+        scheduleOrder: form.scheduleOrder,
+        shareCredit: form.shareCredit,
+        withdrawBalance: form.withdrawBalance,
       });
       toast.success("User updated successfully.");
       closeDialog();
@@ -219,7 +228,7 @@ export default function UserDetailPage() {
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold text-black">{displayName}</h1>
             {user.disabled ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-soft-grey px-2.5 py-1 text-xs font-medium text-light-grey">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-200 px-2.5 py-1 text-xs font-medium text-light-grey">
                 <span className="h-1.5 w-1.5 rounded-full bg-light-grey" />
                 Disabled
               </span>
@@ -232,12 +241,12 @@ export default function UserDetailPage() {
           </div>
           <p className="mt-1 font-mono text-sm text-light-grey">{user.email ?? "—"}</p>
         </div>
-        <button
+        <Button
+          variant="outline"
           onClick={openEdit}
-          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-black transition-colors hover:border-primary hover:text-primary"
         >
           Edit
-        </button>
+        </Button>
       </div>
 
       {/* Cards */}
@@ -295,6 +304,9 @@ export default function UserDetailPage() {
             { label: "Purchase Info by Mail", value: formatBool(user.getPurchaseInfoByMail) },
             { label: "Get Promotions", value: formatBool(user.getPromotions) },
             { label: "Allow Win a Coffee", value: formatBool(user.allowWinACoffee) },
+            { label: "Schedule Order", value: formatBool(user.scheduleOrder) },
+            { label: "Share Credit", value: formatBool(user.shareCredit) },
+            { label: "Withdraw Balance", value: formatBool(user.withdrawBalance) },
           ]}
         />
 
@@ -461,6 +473,9 @@ export default function UserDetailPage() {
                       { key: "getPromotions", label: "Get Promotions" },
                       { key: "allowWinACoffee", label: "Allow Win a Coffee" },
                       { key: "disabled", label: "Disabled" },
+                      { key: "scheduleOrder", label: "Schedule Order" },
+                      { key: "shareCredit", label: "Share Credit" },
+                      { key: "withdrawBalance", label: "Withdraw Balance" },
                     ] as { key: keyof UserEditForm; label: string }[]
                   ).map(({ key, label }) => (
                     <label key={key} className="flex cursor-pointer items-center justify-between px-3 py-2.5 hover:bg-[#fafafa]">
@@ -475,25 +490,6 @@ export default function UserDetailPage() {
                   ))}
                 </div>
               </div>
-
-              {/* Read-only fields */}
-              <div>
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-light-grey">Read-only</p>
-                <div className="space-y-2 rounded-lg border border-border bg-[#fafafa] px-3 py-2">
-                  {[
-                    { label: "Email", value: user.email ?? "—" },
-                    { label: "Doc ID", value: user.docId ?? "—" },
-                    { label: "FCM Token", value: user.fcmToken ?? "—" },
-                    { label: "Email Verified", value: formatBool(user.emailVerified) },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="flex items-center justify-between gap-4">
-                      <span className="shrink-0 text-xs text-light-grey">{label}</span>
-                      <span className="truncate font-mono text-xs text-black" title={value}>{value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
             </div>
 
             {/* Dialog footer */}
