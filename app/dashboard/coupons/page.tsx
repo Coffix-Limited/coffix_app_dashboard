@@ -25,6 +25,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { CouponsFilterBar } from "./components/CouponsFilterBar";
 import { formatDateTime } from "@/app/utils/formatting";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -82,6 +83,13 @@ export default function CouponsPage() {
 
   const [search, setSearch] = useState("");
   // const [typeFilter, setTypeFilter] = useState("All");
+
+  const anyFilterActive = search.trim() !== "";
+
+  function clearAllFilters() {
+    setSearch("");
+  }
+
   const [sortKey, setSortKey] = useState<CouponSortKey>("createdAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -359,15 +367,11 @@ export default function CouponsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          type="text"
-          placeholder="Search by notes…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm text-black outline-none placeholder:text-light-grey focus:border-primary sm:max-w-xs"
-        />
-      </div>
+      <CouponsFilterBar
+        search={search} setSearch={setSearch}
+        anyFilterActive={anyFilterActive}
+        clearAllFilters={clearAllFilters}
+      />
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (

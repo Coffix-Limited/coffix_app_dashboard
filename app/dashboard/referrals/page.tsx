@@ -13,6 +13,7 @@ import {
 } from "./constants/referralFieldConstants";
 import { escapeCSV, parseCSVText, triggerCSVDownload } from "@/app/utils/csvUtils";
 import { Button } from "@/components/ui/button";
+import { ReferralsFilterBar } from "./components/ReferralsFilterBar";
 import { formatDateTime } from "@/app/utils/formatting";
 import {
   Dialog,
@@ -55,6 +56,17 @@ export default function ReferralsPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
+
+  const anyFilterActive = useMemo(
+    () => search.trim() !== "" || statusFilter !== "All",
+    [search, statusFilter]
+  );
+
+  function clearAllFilters() {
+    setSearch("");
+    setStatusFilter("All");
+  }
+
   const [sortKey, setSortKey] = useState<SortKey>("referralTime");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [importLoading, setImportLoading] = useState(false);
@@ -229,30 +241,12 @@ export default function ReferralsPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          type="text"
-          placeholder="Search by referrer or referee…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm text-black outline-none placeholder:text-black focus:border-primary sm:max-w-xs"
-        />
-        <div className="flex flex-wrap gap-2">
-          {(["All", "Active", "Disabled"] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setStatusFilter(v)}
-              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                statusFilter === v
-                  ? "border-primary bg-primary text-white"
-                  : "border-border text-black hover:bg-soft-grey hover:text-white"
-              }`}
-            >
-              {v === "All" ? "All Statuses" : v}
-            </button>
-          ))}
-        </div>
-      </div>
+      <ReferralsFilterBar
+        search={search} setSearch={setSearch}
+        statusFilter={statusFilter} setStatusFilter={(v) => setStatusFilter(v as StatusFilter)}
+        anyFilterActive={anyFilterActive}
+        clearAllFilters={clearAllFilters}
+      />
 
       <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
         <table className="w-full text-sm">

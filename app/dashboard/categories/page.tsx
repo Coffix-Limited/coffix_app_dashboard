@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { useDashboardStore } from "../products/store/useDashboardStore";
 import { ProductService } from "../products/service/ProductService";
@@ -19,12 +19,21 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { CategoriesFilterBar } from "./components/CategoriesFilterBar";
 
 type ImportError = { row: number; field: string; reason: string };
 type ImportPreview = { validRows: Record<string, string>[]; errors: ImportError[] } | null;
 
 export default function CategoriesPage() {
   const categories = useDashboardStore((s) => s.categories);
+
+  const [search, setSearch] = useState("");
+
+  const anyFilterActive = search.trim() !== "";
+
+  function clearAllFilters() {
+    setSearch("");
+  }
 
   const [orderedCategories, setOrderedCategories] = useState(
     [...categories].sort((a, b) => Number(a.order ?? 999) - Number(b.order ?? 999))
@@ -36,6 +45,12 @@ export default function CategoriesPage() {
       [...categories].sort((a, b) => Number(a.order ?? 999) - Number(b.order ?? 999))
     );
   }, [categories]);
+
+  const displayed = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return orderedCategories;
+    return orderedCategories.filter((c) => (c.name ?? "").toLowerCase().includes(q));
+  }, [orderedCategories, search]);
 
   const [categoryDialog, setCategoryDialog] = useState<"create" | "edit" | "delete" | null>(null);
   const [categoryForm, setCategoryForm] = useState({ name: "" });
@@ -263,6 +278,12 @@ export default function CategoriesPage() {
         </div>
       </div>
 
+      <CategoriesFilterBar
+        search={search} setSearch={setSearch}
+        anyFilterActive={anyFilterActive}
+        clearAllFilters={clearAllFilters}
+      />
+
       <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
         <table className="w-full text-sm">
           <thead>
@@ -272,20 +293,20 @@ export default function CategoriesPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {orderedCategories.length === 0 ? (
+            {displayed.length === 0 ? (
               <tr>
                 <td colSpan={2} className="px-5 py-10 text-center text-light-grey">
-                  No categories yet.
+                  No categories found.
                 </td>
               </tr>
             ) : (
-              orderedCategories.map((c, i) => (
+              displayed.map((c, i) => (
                 <tr
                   key={c.docId}
-                  draggable
-                  onDragStart={() => { dragIndex.current = i; }}
+                  draggable={!anyFilterActive}
+                  onDragStart={() => { if (!anyFilterActive) dragIndex.current = i; }}
                   onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => handleDrop(i)}
+                  onDrop={() => { if (!anyFilterActive) handleDrop(i); }}
                   className="transition-colors hover:bg-background"
                 >
                   <td className="px-5 py-3">

@@ -7,6 +7,7 @@ import { useDashboardStore } from "../products/store/useDashboardStore";
 import { ProductService } from "../products/service/ProductService";
 import { Button } from "@/components/ui/button";
 import { escapeCSV, downloadCSV } from "@/app/utils/csv";
+import { ModifierGroupsFilterBar } from "./components/ModifierGroupsFilterBar";
 
 type NewGroupForm = {
     name: string;
@@ -27,6 +28,13 @@ export default function ModifierGroupsPage() {
     const router = useRouter();
     const [search, setSearch] = useState("");
     const [requiredFilter, setRequiredFilter] = useState<"All" | "Required" | "Optional">("All");
+
+    const anyFilterActive = useMemo(() => search.trim() !== "" || requiredFilter !== "All", [search, requiredFilter]);
+
+    function clearAllFilters() {
+      setSearch("");
+      setRequiredFilter("All");
+    }
     type GroupSortKey = "name" | "count";
     type SortDir = "asc" | "desc";
     const [sortKey, setSortKey] = useState<GroupSortKey>("name");
@@ -148,26 +156,12 @@ export default function ModifierGroupsPage() {
                 </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-                <input
-                    type="text"
-                    placeholder="Search modifier groups…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm text-black outline-none placeholder:text-light-grey focus:border-primary sm:max-w-xs"
-                />
-                <div className="flex flex-wrap gap-2">
-                    {(["All", "Required", "Optional"] as const).map((v) => (
-                        <button
-                            key={v}
-                            onClick={() => setRequiredFilter(v)}
-                            className={`rounded-full border px-3 py-1 text-xs transition-colors ${requiredFilter === v ? "border-primary bg-primary text-white" : "border-border text-black "}`}
-                        >
-                            {v}
-                        </button>
-                    ))}
-                </div>
-            </div>
+            <ModifierGroupsFilterBar
+                search={search} setSearch={setSearch}
+                requiredFilter={requiredFilter} setRequiredFilter={setRequiredFilter}
+                anyFilterActive={anyFilterActive}
+                clearAllFilters={clearAllFilters}
+            />
 
             <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
                 <table className="w-full text-sm">

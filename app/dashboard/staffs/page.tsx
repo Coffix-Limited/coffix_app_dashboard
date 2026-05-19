@@ -20,6 +20,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { StaffsFilterBar } from "./components/StaffsFilterBar";
 
 // ─── Form types ───────────────────────────────────────────────────────────────
 
@@ -291,6 +292,17 @@ export default function StaffsPage() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"All" | "admin" | "store_manager">("All");
   const [statusFilter, setStatusFilter] = useState<"All" | "Enabled" | "Disabled">("All");
+
+  const anyFilterActive = useMemo(
+    () => search.trim() !== "" || roleFilter !== "All" || statusFilter !== "All",
+    [search, roleFilter, statusFilter]
+  );
+
+  function clearAllFilters() {
+    setSearch("");
+    setRoleFilter("All");
+    setStatusFilter("All");
+  }
   type StaffSortKey = "email" | "role" | "status";
   type SortDir = "asc" | "desc";
   const [sortKey, setSortKey] = useState<StaffSortKey>("email");
@@ -605,37 +617,13 @@ export default function StaffsPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          type="text"
-          placeholder="Search by email…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm text-black outline-none placeholder:text-light-grey focus:border-primary sm:max-w-xs"
-        />
-        <div className="flex flex-wrap gap-2">
-          {(["All", "admin", "store_manager"] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setRoleFilter(v)}
-              className={`rounded-full border px-3 py-1 text-xs transition-colors ${roleFilter === v ? "border-primary bg-primary text-white" : "border-border text-black hover:bg-soft-grey"}`}
-            >
-              {v === "All" ? "All Roles" : v === "admin" ? "Admin" : "Store Manager"}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {(["All", "Enabled", "Disabled"] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setStatusFilter(v)}
-              className={`rounded-full border px-3 py-1 text-xs transition-colors ${statusFilter === v ? "border-primary bg-primary text-white" : "border-border text-black hover:bg-soft-grey"}`}
-            >
-              {v === "All" ? "All Statuses" : v}
-            </button>
-          ))}
-        </div>
-      </div>
+      <StaffsFilterBar
+        search={search} setSearch={setSearch}
+        roleFilter={roleFilter} setRoleFilter={setRoleFilter}
+        statusFilter={statusFilter} setStatusFilter={setStatusFilter}
+        anyFilterActive={anyFilterActive}
+        clearAllFilters={clearAllFilters}
+      />
 
       {/* Table */}
       <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">

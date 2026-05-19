@@ -10,6 +10,7 @@ import { useAuth } from "@/app/lib/AuthContext";
 import { formatDateTime, formatDocId } from "@/app/utils/formatting";
 import { escapeCSV, tsToISO, triggerCSVDownload } from "@/app/utils/csvUtils";
 import { Button } from "@/components/ui/button";
+import { EmailTemplatesFilterBar } from "./components/EmailTemplatesFilterBar";
 import { renderEmailTemplate } from "@/app/lib/renderEmailTemplate";
 import { sanitizeHtml } from "@/app/lib/sanitize";
 import type { Editor } from "@tiptap/react";
@@ -336,6 +337,13 @@ export default function EmailTemplatesPage() {
   const templates = useEmailTemplateStore((s) => s.templates);
 
   const [search, setSearch] = useState("");
+
+  const anyFilterActive = search.trim() !== "";
+
+  function clearAllFilters() {
+    setSearch("");
+  }
+
   type TemplateSortKey = "name" | "updatedAt";
   type SortDir = "asc" | "desc";
   const [sortKey, setSortKey] = useState<TemplateSortKey>("name");
@@ -517,15 +525,11 @@ export default function EmailTemplatesPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          type="text"
-          placeholder="Search by name, ID or notes…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm text-black outline-none placeholder:text-light-grey focus:border-primary sm:max-w-xs"
-        />
-      </div>
+      <EmailTemplatesFilterBar
+        search={search} setSearch={setSearch}
+        anyFilterActive={anyFilterActive}
+        clearAllFilters={clearAllFilters}
+      />
 
       {/* Table */}
       <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
