@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useDashboardStore } from "../products/store/useDashboardStore";
 import { ProductService } from "../products/service/ProductService";
+import { Button } from "@/components/ui/button";
+import { escapeCSV, downloadCSV } from "@/app/utils/csv";
 
 type NewGroupForm = {
     name: string;
@@ -117,6 +119,15 @@ export default function ModifierGroupsPage() {
         }
     }
 
+    function exportToCSV() {
+        downloadCSV("modifier-groups", ["docId", "name", "required", "modifierCount"], modifierGroups.map((g) => [
+            escapeCSV(g.docId ?? ""),
+            escapeCSV(g.name ?? ""),
+            g.required ?? false,
+            modifiers.filter((m) => g.modifierIds?.includes(m.docId ?? "")).length,
+        ]));
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -126,12 +137,15 @@ export default function ModifierGroupsPage() {
                         {modifierGroups.length} group{modifierGroups.length !== 1 ? "s" : ""} total
                     </p>
                 </div>
-                <button
-                    onClick={() => setShowCreate(true)}
-                    className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
-                >
-                    + New Group
-                </button>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={exportToCSV}>Export CSV</Button>
+                    <button
+                        onClick={() => setShowCreate(true)}
+                        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
+                    >
+                        + New Group
+                    </button>
+                </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">

@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/app/utils/formatting";
+import { escapeCSV, tsToISO, downloadCSV } from "@/app/utils/csv";
+import { headers } from "next/headers";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -206,11 +208,11 @@ export default function CouponsPage() {
   // ── CSV Export ──
 
   function exportToCSV() {
-    const headers = [
-      "docId", "type", "amount", "expiryDate", "storeId", "notes",
+    downloadCSV("coupons", [
+      "docId", "docId", "type", "amount", "expiryDate", "storeId", "notes",
       "customerEmail", "createdAt",
-    ];
-    const rows = filtered.map((c) => [
+    ], filtered.map((c) => [
+      escapeCSV(c.docId ?? ""),
       escapeCSV(c.docId ?? ""),
       escapeCSV(c.type ?? ""),
       String(c.amount ?? ""),
@@ -355,7 +357,7 @@ export default function CouponsPage() {
           >
             {importLoading ? "Importing…" : "Import CSV"}
           </Button> */}
-          <Button size="sm" onClick={exportToCSV} disabled={filtered.length === 0}>
+          <Button  onClick={exportToCSV} disabled={filtered.length === 0}>
             Export CSV
           </Button>
         </div>

@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 
 type ImportError = { row: number; field: string; reason: string };
 type ImportPreview = { validRows: Record<string, string>[]; errors: ImportError[] } | null;
+import { escapeCSV, downloadCSV } from "@/app/utils/csv";
 
 export default function CategoriesPage() {
   const categories = useDashboardStore((s) => s.categories);
@@ -224,6 +225,14 @@ export default function CategoriesPage() {
     }
   }
 
+  function exportToCSV() {
+    downloadCSV("categories", ["docId", "name", "order"], orderedCategories.map((c) => [
+      escapeCSV(c.docId ?? ""),
+      escapeCSV(c.name ?? ""),
+      c.order ?? "",
+    ]));
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -257,14 +266,17 @@ export default function CategoriesPage() {
           >
             Export CSV
           </Button>
+          <div className="flex gap-2">
+          <Button variant="outline"  onClick={exportToCSV}>Export CSV</Button>
           <Button
-            onClick={() => {
-              setCategoryForm({ name: "" });
-              setCategoryDialog("create");
-            }}
-          >
-            + New Category
-          </Button>
+              onClick={() => {
+                setCategoryForm({ name: "" });
+                setCategoryDialog("create");
+              }}
+            >
+              + New Category
+            </Button>
+        </div>
         </div>
       </div>
 

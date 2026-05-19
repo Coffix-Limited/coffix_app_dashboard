@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { UsersFilterBar } from "./components/UsersFilterBar";
 
+import { escapeCSV, downloadCSV } from "@/app/utils/csv";
 
 function dateInRange(value: Date | undefined, from: string, to: string): boolean {
   if (!from && !to) return true;
@@ -422,6 +423,18 @@ export default function UsersPage() {
     }
   }
 
+  function exportToCSV() {
+    downloadCSV("users", ["docId", "firstName", "lastName", "email", "mobile", "creditAvailable", "disabled"], users.map((u) => [
+      escapeCSV(u.docId ?? ""),
+      escapeCSV(u.firstName ?? ""),
+      escapeCSV(u.lastName ?? ""),
+      escapeCSV(u.email ?? ""),
+      escapeCSV(u.mobile ?? ""),
+      u.creditAvailable ?? 0,
+      u.disabled ?? false,
+    ]));
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -431,6 +444,7 @@ export default function UsersPage() {
             {users.length} user{users.length !== 1 ? "s" : ""} total
           </p>
         </div>
+        <Button variant="outline"  onClick={exportToCSV}>Export CSV</Button>
         <div className="flex gap-2">
           <input
             ref={fileInputRef}

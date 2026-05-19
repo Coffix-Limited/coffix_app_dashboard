@@ -21,6 +21,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { StoresFilterBar } from "./components/StoresFilterBar";
+import { escapeCSV, downloadCSV } from "@/app/utils/csv";
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
 type Day = typeof DAYS[number];
@@ -339,6 +340,18 @@ export default function StoresPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function exportToCSV() {
+    downloadCSV("stores", ["docId", "name", "email", "contactNumber", "location", "address", "disabled"], stores.map((s) => [
+      escapeCSV(s.docId ?? ""),
+      escapeCSV(s.name ?? ""),
+      escapeCSV(s.email ?? ""),
+      escapeCSV(s.contactNumber ?? ""),
+      escapeCSV(s.location ?? ""),
+      escapeCSV(s.address ?? ""),
+      s.disabled ?? false,
+    ]));
   }
 
   return (

@@ -1,6 +1,5 @@
 import { db } from "@/app/lib/firebase";
 import {
-  addDoc,
   arrayRemove,
   arrayUnion,
   collection,
@@ -17,7 +16,6 @@ import { Product } from "../interface/product";
 import { Modifier } from "../interface/modifier";
 import { ModifierGroup } from "../interface/modifierGroup";
 import { Category } from "../interface/category";
-import { formatDocId } from "@/app/utils/formatting";
 
 function snapToArray<T>(
   snapshot: QuerySnapshot<DocumentData, DocumentData>,
@@ -98,9 +96,8 @@ export const ProductService = {
     deleteDoc(doc(db, "modifierGroups", docId)),
 
   createCategory: async (data: Omit<Category, "docId">) => {
-    const docId = formatDocId(data.name ?? "");
-    const ref = doc(db, "productCategories", docId);
-    await setDoc(ref, data);
+    const ref = doc(collection(db, "productCategories"));
+    await setDoc(ref, { ...data, docId: ref.id });
     return ref;
   },
 
