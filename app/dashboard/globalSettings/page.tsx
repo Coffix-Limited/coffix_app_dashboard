@@ -555,7 +555,7 @@ export default function GlobalSettingsPage() {
           if (!open) setValidationErrors([]);
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Fix validation errors</DialogTitle>
             <DialogDescription>

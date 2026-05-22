@@ -318,12 +318,9 @@ function PreviewModal({ html, onClose }: { html: string; onClose: () => void }) 
           />
         </div>
         <div className="flex justify-end border-t border-border px-6 py-4">
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-border px-4 py-2 text-sm text-black "
-          >
+          <Button variant="outline" onClick={onClose}>
             Close Preview
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -583,24 +580,27 @@ export default function EmailTemplatesPage() {
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-end gap-2">
-                      <button
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => openPreview(template)}
-                        className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-black transition-colors hover:border-primary hover:text-primary"
                       >
                         Preview
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => openEdit(template)}
-                        className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-black transition-colors hover:border-primary hover:text-primary"
                       >
                         Edit
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
                         onClick={() => handleDelete(template)}
-                        className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-error transition-colors hover:border-error hover:bg-red-50"
                       >
                         Delete
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>

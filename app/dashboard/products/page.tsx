@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ProductsFilterBar } from "./components/ProductsFilterBar";
+import { ImageUploadField } from "@/components/components/ImageUploadField";
 
 type NewProductForm = {
   name: string;
@@ -754,7 +755,7 @@ export default function ProductsPage() {
 
       {/* ── Create Product Dialog ── */}
       <Dialog open={showCreate} onOpenChange={(open) => { if (!open) closeCreate(); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>New Product</DialogTitle>
           </DialogHeader>
@@ -772,12 +773,10 @@ export default function ProductsPage() {
                 {errors.name && <p className="mt-1 text-xs text-error">Name is required.</p>}
               </div>
               <div className="col-span-2">
-                <label className="mb-1.5 block text-xs text-black">Image URL</label>
-                <input
-                  className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
-                  placeholder="https://..."
+                <ImageUploadField
                   value={form.imageUrl}
-                  onChange={(e) => setField("imageUrl", e.target.value)}
+                  onChange={(url) => setField("imageUrl", url)}
+                  disabled={loading}
                 />
               </div>
               <div>

@@ -581,7 +581,7 @@ export default function UsersPage() {
       </div>
 
       <Dialog open={showAddCredits} onOpenChange={(open) => { if (!open) { setShowAddCredits(false); setCreditAmount(""); } }}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Add Credits</DialogTitle>
           </DialogHeader>

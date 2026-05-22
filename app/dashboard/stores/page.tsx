@@ -21,6 +21,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { StoresFilterBar } from "./components/StoresFilterBar";
+import { ImageUploadField } from "@/components/components/ImageUploadField";
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
 type Day = typeof DAYS[number];
@@ -60,7 +61,7 @@ const emptyForm: StoreForm = {
 };
 
 const REQUIRED: (keyof Omit<StoreForm, "openingHours">)[] = [
-  "name", "email", "contactNumber", "location", "address",
+  "name", "email", "contactNumber", "location", "address", "printerId",
 ];
 
 export default function StoresPage() {
@@ -327,7 +328,7 @@ export default function StoresPage() {
         imageUrl: form.imageUrl.trim() || null,
         gstNumber: form.gstNumber.trim() || null,
         invoiceText: form.invoiceText.trim() || null,
-        printerId: form.printerId.trim() || undefined,
+        printerId: form.printerId.trim(),
         openingHours,
         disable: false,
       });
@@ -514,15 +515,10 @@ export default function StoresPage() {
                   {errors.name && <p className="mt-1 text-xs text-error">Name is required.</p>}
                 </div>
 
-                <div>
-                  <label className="mb-1.5 block text-xs text-light-grey">Image URL</label>
-                  <input
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
-                    placeholder="https://..."
-                    value={form.imageUrl}
-                    onChange={(e) => setField("imageUrl", e.target.value)}
-                  />
-                </div>
+                <ImageUploadField
+                  value={form.imageUrl}
+                  onChange={(url) => setField("imageUrl", url)}
+                />
 
                 <div>
                   <label className="mb-1.5 block text-xs text-light-grey">Email *</label>
@@ -570,17 +566,6 @@ export default function StoresPage() {
                   {errors.address && <p className="mt-1 text-xs text-error">Required.</p>}
                 </div>
 
-                <div className="col-span-2">
-                  <label className="mb-1.5 block text-xs text-light-grey">Address *</label>
-                  <input
-                    className={`w-full rounded-lg border px-3 py-2 text-sm text-black outline-none focus:border-primary ${errors.address ? "border-error" : "border-border"}`}
-                    placeholder="e.g. TUR, AUK"
-                    value={form.address}
-                    onChange={(e) => setField("address", e.target.value)}
-                  />
-                  {errors.address && <p className="mt-1 text-xs text-error">Required.</p>}
-                </div>
-
                 <div>
                   <label className="mb-1.5 block text-xs text-light-grey">GST Number</label>
                   <input
@@ -602,13 +587,14 @@ export default function StoresPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs text-light-grey">Printer ID</label>
+                  <label className="mb-1.5 block text-xs text-light-grey">Printer ID *</label>
                   <input
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
-                    placeholder="Optional"
+                    className={`w-full rounded-lg border px-3 py-2 text-sm text-black outline-none focus:border-primary ${errors.printerId ? "border-error" : "border-border"}`}
                     value={form.printerId}
                     onChange={(e) => setField("printerId", e.target.value)}
+                    placeholder="UAT"
                   />
+                  {errors.printerId && <p className="mt-1 text-xs text-error">Required.</p>}
                 </div>
               </div>
 
@@ -655,19 +641,18 @@ export default function StoresPage() {
             </div>
 
             <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-              <button
+              <Button
+                variant="outline"
                 onClick={closeDialog}
-                className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-soft-grey"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleCreate}
                 disabled={loading}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50"
               >
                 {loading ? "Creating…" : "Create Store"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

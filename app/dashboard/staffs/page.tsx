@@ -189,21 +189,13 @@ function StaffDialog({
                 <label className="text-xs text-light-grey">Assigned Stores *</label>
                 {stores.length > 0 && (
                   <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={onSelectAll}
-                      className="text-xs text-primary hover:underline"
-                    >
+                    <Button type="button" variant="link" size="xs" onClick={onSelectAll}>
                       Select all
-                    </button>
+                    </Button>
                     <span className="text-xs text-light-grey">·</span>
-                    <button
-                      type="button"
-                      onClick={onUnselectAll}
-                      className="text-xs text-light-grey hover:underline"
-                    >
+                    <Button type="button" variant="ghost" size="xs" onClick={onUnselectAll}>
                       Unselect all
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -258,17 +250,10 @@ function StaffDialog({
         </div>
 
         <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]"
-          >
+          <Button variant="outline" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            onClick={onSubmit}
-            disabled={loading}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50"
-          >
+          </Button>
+          <Button onClick={onSubmit} disabled={loading}>
             {loading
               ? isEdit
                 ? "Saving…"
@@ -276,7 +261,7 @@ function StaffDialog({
               : isEdit
                 ? "Save Changes"
                 : "Create Staff"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -607,10 +592,7 @@ export default function StaffsPage() {
           </Button> */}
           <div className="flex gap-2">
           <Button variant="outline"  onClick={exportToCSV}>Export CSV</Button>
-          <Button
-              onClick={openCreate}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
-            >
+          <Button onClick={openCreate}>
               + New Staff
             </Button>
         </div>
@@ -700,12 +682,13 @@ export default function StaffsPage() {
 
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-end gap-2">
-                      <button
+                      <Button
+                        variant="destructive"
+                        size="sm"
                         onClick={(e) => { e.stopPropagation(); handleDelete(staff); }}
-                        className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-error transition-colors hover:border-error hover:bg-red-50"
                       >
                         Delete
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>

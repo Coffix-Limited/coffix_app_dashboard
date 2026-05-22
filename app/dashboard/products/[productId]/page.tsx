@@ -10,6 +10,7 @@ import { Product } from "../interface/product";
 import { ProductService } from "../service/ProductService";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { ImageUploadField } from "@/components/components/ImageUploadField";
 type DialogMode = "edit-product" | "delete-product" | "add-modifier" | "remove-modifier-group" | null;
 
 function MultiSelect({
@@ -37,9 +38,9 @@ function MultiSelect({
         <label className="text-xs text-black">{label}</label>
         {showSelectAll && options.length > 0 && (
           <div className="flex gap-2">
-            <button type="button" onClick={() => onChange(options.map((o) => o.value))} disabled={allSelected} className="text-xs text-primary hover:underline disabled:opacity-40">Select all</button>
+            <Button type="button" variant="link" size="xs" onClick={() => onChange(options.map((o) => o.value))} disabled={allSelected}>Select all</Button>
             <span className="text-xs text-black">·</span>
-            <button type="button" onClick={() => onChange([])} disabled={selected.length === 0} className="text-xs text-black hover:text-black hover:underline disabled:opacity-40">Unselect all</button>
+            <Button type="button" variant="ghost" size="xs" onClick={() => onChange([])} disabled={selected.length === 0}>Unselect all</Button>
           </div>
         )}
       </div>
@@ -234,28 +235,29 @@ export default function ProductDetailPage() {
             {/* Header */}
             <div className="flex items-start justify-between">
                 <div>
-                    <button
+                    <Button
+                        variant="outline"
                         onClick={() => router.push("/dashboard/products")}
-                        className="mb-2 text-xs text-black hover:text-black"
+                        size="sm"
                     >
                         ← Back to Products
-                    </button>
+                    </Button>
                     <h1 className="text-2xl font-semibold text-black">{product.name ?? "—"}</h1>
                     <p className="mt-1 text-sm text-black">{getCategoryName(product.categoryId)}</p>
                 </div>
                 <div className="flex gap-2">
-                    <button
+                    <Button
+                        variant="outline"
                         onClick={openEditProduct}
-                        className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-black transition-colors hover:border-primary hover:text-primary"
                     >
                         Edit
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="destructive"
                         onClick={() => setDialog("delete-product")}
-                        className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
                     >
                         Delete
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -354,12 +356,9 @@ export default function ProductDetailPage() {
                 <div className="lg:col-span-2 space-y-4">
                     <div className="flex items-center justify-between">
                         <h2 className="font-semibold text-black">Modifier Groups</h2>
-                        <button
-                            onClick={openAddModifier}
-                            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-80"
-                        >
+                        <Button onClick={openAddModifier} size="sm">
                             + Add Modifier Group
-                        </button>
+                        </Button>
                     </div>
 
                     {productModifierGroups.length === 0 ? (
@@ -390,12 +389,13 @@ export default function ProductDetailPage() {
                                             <span className="font-medium text-black">{group.name ?? "—"}</span>
                                         </div>
                                     </div>
-                                    <button
+                                    <Button
+                                        variant="destructive"
+                                        size="xs"
                                         onClick={() => openRemoveModifierGroup(group.docId ?? "")}
-                                        className="text-xs text-error hover:opacity-70"
                                     >
                                         Remove
-                                    </button>
+                                    </Button>
                                 </div>
                             ))}
                         </div>
@@ -418,16 +418,19 @@ export default function ProductDetailPage() {
                             <>
                                 <h3 className="mb-4 text-lg font-semibold text-black">Edit Product</h3>
                                 <div className="space-y-3">
-                                    {(["name", "imageUrl"] as const).map((field) => (
-                                        <div key={field}>
-                                            <label className="mb-1 block text-xs text-black capitalize">{field}</label>
-                                            <input
-                                                className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
-                                                value={(productForm[field] as string) ?? ""}
-                                                onChange={(e) => setProductForm((f) => ({ ...f, [field]: e.target.value }))}
-                                            />
-                                        </div>
-                                    ))}
+                                    <div>
+                                        <label className="mb-1 block text-xs text-black capitalize">name</label>
+                                        <input
+                                            className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
+                                            value={(productForm.name as string) ?? ""}
+                                            onChange={(e) => setProductForm((f) => ({ ...f, name: e.target.value }))}
+                                        />
+                                    </div>
+                                    <ImageUploadField
+                                        value={(productForm.imageUrl as string) ?? ""}
+                                        onChange={(url) => setProductForm((f) => ({ ...f, imageUrl: url }))}
+                                        disabled={loading}
+                                    />
                                     <div>
                                         <label className="mb-1 block text-xs text-black capitalize">Price</label>
                                         <div className="relative">
@@ -477,10 +480,10 @@ export default function ProductDetailPage() {
                                     />
                                 </div>
                                 <div className="mt-5 flex justify-end gap-2">
-                                    <button onClick={() => setDialog(null)} className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]">Cancel</button>
-                                    <button onClick={handleUpdateProduct} disabled={loading} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50">
+                                    <Button onClick={() => setDialog(null)} variant="outline">Cancel</Button>
+                                    <Button onClick={handleUpdateProduct} disabled={loading} >
                                         {loading ? "Saving…" : "Save"}
-                                    </button>
+                                    </Button>
                                 </div>
                             </>
                         )}
@@ -493,10 +496,10 @@ export default function ProductDetailPage() {
                                     Are you sure you want to delete <strong className="text-black">{product.name}</strong>? This cannot be undone.
                                 </p>
                                 <div className="mt-5 flex justify-end gap-2">
-                                    <button onClick={() => setDialog(null)} className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]">Cancel</button>
-                                    <button onClick={handleDeleteProduct} disabled={loading} className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50">
+                                    <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
+                                    <Button variant="solid-error" onClick={handleDeleteProduct} disabled={loading}>
                                         {loading ? "Deleting…" : "Delete"}
-                                    </button>
+                                    </Button>
                                 </div>
                             </>
                         )}
@@ -523,10 +526,10 @@ export default function ProductDetailPage() {
                                     </div>
                                 </div>
                                 <div className="mt-5 flex justify-end gap-2">
-                                    <button onClick={() => setDialog(null)} className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]">Cancel</button>
-                                    <button onClick={handleAddModifierGroup} disabled={loading || !selectedGroupId} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50">
+                                    <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
+                                    <Button onClick={handleAddModifierGroup} disabled={loading || !selectedGroupId}>
                                         {loading ? "Saving…" : "Add"}
-                                    </button>
+                                    </Button>
                                 </div>
                             </>
                         )}
@@ -538,10 +541,10 @@ export default function ProductDetailPage() {
                                 <h3 className="mb-2 text-lg font-semibold text-black">Remove Modifier Group</h3>
                                 <p className="text-sm text-black">Remove this modifier group from the product? The group itself will not be deleted.</p>
                                 <div className="mt-5 flex justify-end gap-2">
-                                    <button onClick={() => setDialog(null)} className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]">Cancel</button>
-                                    <button onClick={handleRemoveModifierGroup} disabled={loading} className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50">
+                                    <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
+                                    <Button variant="solid-error" onClick={handleRemoveModifierGroup} disabled={loading}>
                                         {loading ? "Removing…" : "Remove"}
-                                    </button>
+                                    </Button>
                                 </div>
                             </>
                         )}

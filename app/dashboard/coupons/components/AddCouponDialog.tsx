@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CouponService } from "../service/CouponService";
 import { Coupon } from "../interface/coupon";
+import { Button } from "@/components/ui/button";
 
 interface Store {
   docId?: string;
@@ -143,20 +144,12 @@ export function AddCouponDialog({ open, onClose, stores, defaultEmail }: AddCoup
         </div>
 
         <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-          <button
-            onClick={onClose}
-            disabled={loading}
-            className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0] disabled:opacity-50"
-          >
+          <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancel
-          </button>
-          <button
-            onClick={handleCreate}
-            disabled={loading}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50"
-          >
+          </Button>
+          <Button onClick={handleCreate} disabled={loading}>
             {loading ? "Creating…" : "Create Coupon"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

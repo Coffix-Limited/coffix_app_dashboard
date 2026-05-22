@@ -8,17 +8,7 @@ import { useStoreStore } from "@/app/dashboard/stores/store/useStoreStore";
 import { CouponService } from "../service/CouponService";
 import { Coupon } from "../interface/coupon";
 import { formatDate, formatDateTime } from "@/app/utils/formatting";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function firestoreTimestampToDateString(value: unknown): string {
-  if (!value) return "";
-  if (value instanceof Date) return value.toLocaleDateString("en-CA");
-  if (typeof value === "object" && value !== null && "seconds" in value) {
-    return new Date((value as { seconds: number }).seconds * 1000).toLocaleDateString("en-CA");
-  }
-  return "";
-}
+import { Button } from "@/components/ui/button";
 
 // ─── Display components ───────────────────────────────────────────────────────
 
@@ -135,22 +125,21 @@ export default function CouponDetailPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => router.push("/dashboard/coupons")}
-            className="mb-2 text-xs text-light-grey hover:text-black"
+            className="mb-2"
           >
             ← Back to Coupons
-          </button>
+          </Button>
           <div className="flex items-center gap-3">
           </div>
           <p className="mt-1 text-sm text-light-grey">{coupon.type ?? "No type"}</p>
         </div>
-        <button
-          onClick={openEdit}
-          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-black transition-colors hover:border-primary hover:text-primary"
-        >
+        <Button variant="outline" onClick={openEdit}>
           Edit
-        </button>
+        </Button>
       </div>
 
       {/* Cards */}
@@ -262,19 +251,12 @@ export default function CouponDetailPage() {
             </div>
 
             <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-              <button
-                onClick={closeEdit}
-                className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]"
-              >
+              <Button variant="outline" onClick={closeEdit}>
                 Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={loading}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50"
-              >
+              </Button>
+              <Button onClick={handleSave} disabled={loading}>
                 {loading ? "Saving…" : "Save Changes"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -586,7 +586,7 @@ export default function CouponsPage() {
         open={bulkDialog === "delete"}
         onOpenChange={(open) => { if (!open) setBulkDialog(null); }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Delete Coupons</DialogTitle>
           </DialogHeader>
@@ -611,7 +611,7 @@ export default function CouponsPage() {
         open={bulkDialog === "expiry"}
         onOpenChange={(open) => { if (!open) { setBulkDialog(null); setBulkExpiry(""); } }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Update Expiry Date</DialogTitle>
           </DialogHeader>
@@ -645,7 +645,7 @@ export default function CouponsPage() {
         open={bulkDialog === "amount"}
         onOpenChange={(open) => { if (!open) { setBulkDialog(null); setBulkAmount(""); } }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Update Amount</DialogTitle>
           </DialogHeader>

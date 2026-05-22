@@ -219,12 +219,14 @@ export default function UserDetailPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => router.push("/dashboard/users")}
-            className="mb-2 text-xs text-light-grey hover:text-black"
+            className="mb-2"
           >
             ← Back to Customers
-          </button>
+          </Button>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold text-black">{displayName}</h1>
             {user.disabled ? (
@@ -494,19 +496,12 @@ export default function UserDetailPage() {
 
             {/* Dialog footer */}
             <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-              <button
-                onClick={closeDialog}
-                className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]"
-              >
+              <Button variant="outline" onClick={closeDialog}>
                 Cancel
-              </button>
-              <button
-                onClick={handleUpdate}
-                disabled={loading}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50"
-              >
+              </Button>
+              <Button onClick={handleUpdate} disabled={loading}>
                 {loading ? "Saving…" : "Save Changes"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -8,6 +8,8 @@ import { useStoreStore } from "../store/useStoreStore";
 import { isStoreOpenAt, DayHours, HolidayHours, Store } from "../interface/store";
 import { StoreService } from "../service/StoreService";
 import { formatTime } from "@/app/utils/formatting";
+import { Button } from "@/components/ui/button";
+import { ImageUploadField } from "@/components/components/ImageUploadField";
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
 type Day = typeof DAYS[number];
@@ -27,7 +29,7 @@ type StoreEditForm = {
 };
 
 const REQUIRED: (keyof Omit<StoreEditForm, "openingHours">)[] = [
-  "name", "email", "contactNumber", "location", "address",
+  "name", "email", "contactNumber", "location", "address", "printerId",
 ];
 
 type DialogMode = "edit-store" | "add-holiday" | "edit-holiday" | "delete-holiday" | null;
@@ -224,10 +226,10 @@ export default function StoreDetailPage() {
         contactNumber: form.contactNumber.trim(),
         location: form.location.trim(),
         address: form.address.trim(),
-        imageUrl: form.imageUrl.trim() || undefined,
+        ...(form.imageUrl.trim() ? { imageUrl: form.imageUrl.trim() } : { imageUrl: "" }),
         gstNumber: form.gstNumber.trim() || undefined,
         invoiceText: form.invoiceText.trim() || undefined,
-        printerId: form.printerId.trim() || undefined,
+        printerId: form.printerId.trim(),
         openingHours,
       });
       toast.success("Store updated successfully.");
@@ -256,12 +258,13 @@ export default function StoreDetailPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <button
+          <Button
             onClick={() => router.push("/dashboard/stores")}
-            className="mb-2 text-xs text-light-grey hover:text-black"
+            variant="outline"
+            size="sm"
           >
             ← Back to Stores
-          </button>
+          </Button>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold text-black">{store.name ?? "—"}</h1>
             {isDisabled ? (
@@ -282,12 +285,12 @@ export default function StoreDetailPage() {
             )}
           </div>
         </div>
-        <button
+        <Button
           onClick={openEdit}
-          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-black transition-colors hover:border-primary hover:text-primary"
+          variant="outline"
         >
           Edit
-        </button>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -362,12 +365,11 @@ export default function StoreDetailPage() {
           <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <h2 className="font-semibold text-black">Special Operating Hours</h2>
-              <button
+              <Button
                 onClick={openAddHoliday}
-                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-80"
               >
                 + Add Holiday
-              </button>
+              </Button>
             </div>
             {sorted.length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-light-grey">No Special Operating Hours set.</p>
@@ -396,18 +398,20 @@ export default function StoreDetailPage() {
                             Closed
                           </span>
                         )}
-                        <button
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => openEditHoliday(dateKey, entry)}
-                          className="text-xs text-light-grey hover:text-primary"
                         >
                           Edit
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
                           onClick={() => openDeleteHoliday(dateKey)}
-                          className="text-xs text-light-grey hover:text-error"
                         >
                           Delete
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   );
@@ -447,12 +451,12 @@ export default function StoreDetailPage() {
                   {errors.name && <p className="mt-1 text-xs text-error">Required.</p>}
                 </div>
 
-                <div>
-                  <label className="mb-1.5 block text-xs text-light-grey">Image URL</label>
-                  <input
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
+                <div className="col-span-2">
+                  <ImageUploadField
                     value={form.imageUrl}
-                    onChange={(e) => setField("imageUrl", e.target.value)}
+                    onChange={(url) => setField("imageUrl", url)}
+                    label="Store Image"
+                    disabled={loading}
                   />
                 </div>
 
@@ -517,12 +521,13 @@ export default function StoreDetailPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs text-light-grey">Printer ID</label>
+                  <label className="mb-1.5 block text-xs text-light-grey">Printer ID *</label>
                   <input
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
+                    className={`w-full rounded-lg border px-3 py-2 text-sm text-black outline-none focus:border-primary ${errors.printerId ? "border-error" : "border-border"}`}
                     value={form.printerId}
                     onChange={(e) => setField("printerId", e.target.value)}
                   />
+                  {errors.printerId && <p className="mt-1 text-xs text-error">Required.</p>}
                 </div>
               </div>
 
@@ -569,19 +574,18 @@ export default function StoreDetailPage() {
             </div>
 
             <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-              <button
+              <Button
+                variant="outline"
                 onClick={closeDialog}
-                className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleUpdate}
                 disabled={loading}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50"
               >
                 {loading ? "Saving…" : "Save Changes"}
-              </button>
+              </Button>
             </div>
           </>)}
 
@@ -656,19 +660,18 @@ export default function StoreDetailPage() {
                 )}
               </div>
               <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-                <button
+                <Button
+                  variant="outline"
                   onClick={closeDialog}
-                  className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleSaveHoliday}
                   disabled={loading}
-                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50"
                 >
                   {loading ? "Saving…" : dialog === "add-holiday" ? "Add Holiday" : "Save Changes"}
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -694,19 +697,17 @@ export default function StoreDetailPage() {
                 </p>
               </div>
               <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-                <button
+                <Button
                   onClick={closeDialog}
-                  className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleDeleteHoliday}
                   disabled={loading}
-                  className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50"
                 >
                   {loading ? "Removing…" : "Remove"}
-                </button>
+                </Button>
               </div>
             </>
           )}
