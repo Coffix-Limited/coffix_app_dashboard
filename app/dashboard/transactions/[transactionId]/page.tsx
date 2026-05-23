@@ -1,11 +1,23 @@
 "use client";
 
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { useTransactionStore } from "../store/useTransactionStore";
 import { useUserStore } from "@/app/dashboard/users/store/useUserStore";
 import { PaymentMethod } from "../interface/transaction";
 import { Item } from "../interface/order";
 import { formatDateTime } from "@/app/utils/formatting";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
@@ -66,6 +78,9 @@ export default function TransactionDetailPage() {
   const { transactionId } = useParams<{ transactionId: string }>();
   const router = useRouter();
 
+  const [refundLoading, setRefundLoading] = useState(false);
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+
   const transactions = useTransactionStore((s) => s.transactions);
   const orders = useTransactionStore((s) => s.orders);
   const users = useUserStore((s) => s.users);
@@ -78,6 +93,34 @@ export default function TransactionDetailPage() {
         Transaction not found.
       </div>
     );
+  }
+
+  async function handleRefund() {
+    setRefundDialogOpen(false);
+    setRefundLoading(true);
+    try {
+      const res = await fetch(
+        "http://127.0.0.1:5001/coffix-app-dev/us-central1/v1/transaction/refund",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ transactionNumber: tx.transactionNumber }),
+        }
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.message ?? `Error ${res.status}`);
+      }
+      toast.success("Refund successful", {
+        description: `Transaction ${tx.transactionNumber} has been refunded.`,
+      });
+    } catch (err) {
+      toast.error("Refund failed", {
+        description: err instanceof Error ? err.message : "Something went wrong.",
+      });
+    } finally {
+      setRefundLoading(false);
+    }
   }
 
   const customer = tx.customerId ? users.find((u) => u.docId === tx.customerId) : undefined;
@@ -95,19 +138,69 @@ export default function TransactionDetailPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => router.push("/dashboard/transactions")}
-            className="mb-2 text-xs text-light-grey hover:text-black"
           >
             ← Back to Transactions
-          </button>
+          </Button>
           <h1 className="font-mono text-2xl font-semibold text-black">
             {tx.transactionNumber ?? tx.docId ?? "—"}
           </h1>
           <p className="mt-1 text-sm text-light-grey">{formatDateTime(tx.createdAt)}</p>
         </div>
-        <div className="pt-6">
+        <div className="flex flex-col items-end gap-2 pt-6">
           <PaymentMethodBadge method={tx.paymentMethod} />
+          {tx.type === "order" && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRefundDialogOpen(true)}
+                disabled={refundLoading}
+                className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+              >
+                {refundLoading ? "Refunding…" : "Refund Transaction"}
+              </Button>
+
+              <Dialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
+                <DialogContent className="max-w-sm">
+                  <DialogHeader>
+                    <DialogTitle>Refund Transaction</DialogTitle>
+                    <DialogDescription>
+                      The customer will receive the full amount back as Coffix Credit.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="divide-y divide-border rounded-lg border border-border text-sm">
+                    <div className="flex items-center justify-between px-4 py-3">
+                      <span className="text-light-grey">Transaction Number</span>
+                      <span className="font-mono font-medium text-black">{tx.transactionNumber ?? "—"}</span>
+                    </div>
+                    <div className="flex items-center justify-between px-4 py-3">
+                      <span className="text-light-grey">Transaction Amount</span>
+                      <span className="font-medium text-red-600">
+                        {tx.amount != null ? `$${tx.amount.toFixed(2)}` : "—"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button variant="outline">Cancel</Button>
+                    </DialogClose>
+                    <Button
+                      onClick={handleRefund}
+                      className="bg-red-600 text-white hover:bg-red-700"
+                    >
+                      Confirm Refund
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
         </div>
       </div>
 
@@ -128,6 +221,9 @@ export default function TransactionDetailPage() {
             { label: "Windcave Session Id", value: tx.paymentId ?? "—", mono: true },
             { label: "Payment Time", value: formatDateTime(tx.paymentTime) },
             { label: "Created At", value: formatDateTime(tx.createdAt) },
+            ...(tx.type === "refund"
+              ? [{ label: "Original Transaction #", value: tx.originalTransactionNumber ?? "—", mono: true }]
+              : []),
           ]}
         />
 

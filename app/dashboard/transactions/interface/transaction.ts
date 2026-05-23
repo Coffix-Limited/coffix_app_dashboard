@@ -35,4 +35,6 @@ export interface Transaction {
   gst?: number | null;
   gstAmount?: number | null;
   gstNumber?: number | null;
+
+  originalTransactionNumber?: string | null;
 }

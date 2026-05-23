@@ -12,6 +12,7 @@ import { useAuth } from "@/app/lib/AuthContext";
 import { toast } from "sonner";
 import { TransactionService } from "./service/TransactionService";
 import { TransactionsFilterBar } from "./components/TransactionsFilterBar";
+import { StatusChip, StatusChipColor } from "@/components/ui/StatusChip";
 
 type DateRange = { from: string; to: string };
 type NumberRange = { min: string; max: string };
@@ -48,6 +49,18 @@ function PaymentMethodBadge({ method }: { method: PaymentMethod | null | undefin
       {labels[method]}
     </span>
   );
+}
+
+function statusColor(status: Transaction["status"]): StatusChipColor {
+  switch (status) {
+    case "paid":
+    case "approved":
+    case "completed": return "green";
+    case "failed":
+    case "declined":  return "red";
+    case "created":   return "yellow";
+    default:          return "grey";
+  }
 }
 
 type SortKey = "createdAt" | "transactionNumber";
@@ -322,13 +335,14 @@ export default function TransactionsPage() {
               </th>
               <th className="px-5 py-3 text-left font-medium text-light-grey">Type</th>
               <th className="px-5 py-3 text-left font-medium text-light-grey">Amount</th>
+              <th className="px-5 py-3 text-left font-medium text-light-grey">Status</th>
               <th className="px-5 py-3 text-left font-medium text-light-grey">Customer</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {displayed.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-5 py-10 text-center text-light-grey">
+                <td colSpan={8} className="px-5 py-10 text-center text-light-grey">
                   No transactions found.
                 </td>
               </tr>
@@ -357,6 +371,11 @@ export default function TransactionsPage() {
                   <td className="px-5 py-3 text-black">{tx.type ?? "—"}</td>
                   <td className="px-5 py-3 text-black">
                     {tx.amount != null ? `$${tx.amount.toFixed(2)}` : "—"}
+                  </td>
+                  <td className="px-5 py-3">
+                    {tx.status
+                      ? <StatusChip label={tx.status} color={statusColor(tx.status)} />
+                      : <span className="text-black">—</span>}
                   </td>
                   <td className="px-5 py-3 text-black">{getCustomerEmail(tx)}</td>
                 </tr>
