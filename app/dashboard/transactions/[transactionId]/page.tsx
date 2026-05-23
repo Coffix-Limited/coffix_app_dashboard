@@ -96,6 +96,7 @@ export default function TransactionDetailPage() {
   }
 
   async function handleRefund() {
+    if (!tx) return;
     setRefundDialogOpen(false);
     setRefundLoading(true);
     try {
