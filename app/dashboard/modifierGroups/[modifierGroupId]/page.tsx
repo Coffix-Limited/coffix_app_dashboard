@@ -263,7 +263,8 @@ export default function ModifierGroupDetailPage() {
                     onDragStart={() => { dragIndex.current = i; }}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => handleDrop(i)}
-                    className="transition-colors hover:bg-background"
+                    onClick={() => openEditModifier(m)}
+                    className="cursor-pointer transition-colors hover:bg-background"
                   >
                     <td className="px-3 py-3">
                       <svg className="h-4 w-4 shrink-0 cursor-grab text-light-grey active:cursor-grabbing" viewBox="0 0 16 16" fill="currentColor">
@@ -290,11 +291,9 @@ export default function ModifierGroupDetailPage() {
                       )}
                     </td>
                     <td className="px-5 py-3 text-right">
-                      <div className="inline-flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => openEditModifier(m)}>
-                          Edit
-                        </Button>
-                        <Button variant="destructive" size="sm" onClick={() => openDeleteModifier(m)}>
+                      <div className="inline-flex">
+                     
+                        <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); openDeleteModifier(m); }}>
                           Delete
                         </Button>
                       </div>

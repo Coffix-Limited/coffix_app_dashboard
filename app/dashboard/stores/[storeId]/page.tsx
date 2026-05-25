@@ -293,22 +293,26 @@ export default function StoreDetailPage() {
         </Button>
       </div>
 
+      {/* Store image — square to match 1200×1200 mobile app asset */}
+      {store.imageUrl ? (
+        <div className="relative h-48 w-48 overflow-hidden rounded-xl">
+          <Image
+            src={store.imageUrl}
+            alt={store.name ?? "Store"}
+            fill
+            sizes="192px"
+            className="object-cover"
+          />
+        </div>
+      ) : (
+        <div className="flex h-48 w-48 items-center justify-center rounded-xl bg-primary text-4xl font-bold text-white">
+          {(store.name ?? "?")[0].toUpperCase()}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Store Info Card */}
         <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
-          {store.imageUrl ? (
-            <Image
-              src={store.imageUrl}
-              alt={store.name ?? "Store"}
-              width={600}
-              height={200}
-              className="h-44 w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-44 items-center justify-center bg-primary text-5xl font-bold text-white">
-              {(store.name ?? "?")[0].toUpperCase()}
-            </div>
-          )}
           <div className="divide-y divide-border">
             {[
               { label: "Email", value: store.email },
@@ -381,7 +385,11 @@ export default function StoreDetailPage() {
                     weekday: "short", year: "numeric", month: "short", day: "numeric",
                   });
                   return (
-                    <div key={dateKey} className={`flex items-center justify-between px-4 py-3 ${isPast ? "opacity-90" : ""}`}>
+                    <div
+                      key={dateKey}
+                      className={`flex cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-muted/50 ${isPast ? "opacity-90" : ""}`}
+                      onClick={() => openEditHoliday(dateKey, entry)}
+                    >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-black">{dateLabel}</span>
@@ -399,16 +407,9 @@ export default function StoreDetailPage() {
                           </span>
                         )}
                         <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEditHoliday(dateKey, entry)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
                           variant="destructive"
                           size="sm"
-                          onClick={() => openDeleteHoliday(dateKey)}
+                          onClick={(e) => { e.stopPropagation(); openDeleteHoliday(dateKey); }}
                         >
                           Delete
                         </Button>

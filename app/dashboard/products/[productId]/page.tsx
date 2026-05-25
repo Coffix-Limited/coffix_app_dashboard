@@ -261,23 +261,28 @@ export default function ProductDetailPage() {
                 </div>
             </div>
 
+            {/* Product image — square to match 1200×1200 mobile app asset */}
+            {product.imageUrl ? (
+                <div className="relative h-48 w-48 overflow-hidden rounded-xl">
+                    <Image
+                        src={product.imageUrl}
+                        alt={product.name ?? "Product"}
+                        fill
+                        sizes="192px"
+                        className="object-cover"
+                    />
+                </div>
+            ) : (
+                <div className="flex h-48 w-48 items-center justify-center rounded-xl bg-primary text-4xl font-bold text-white">
+                    {(product.name ?? "?")[0].toUpperCase()}
+                </div>
+            )}
+
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                 {/* Left column: product info + status controls */}
                 <div className="lg:col-span-1 space-y-4">
                     <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
-                        {product.imageUrl ? (
-                            <Image
-                                src={product.imageUrl}
-                                alt={product.name ?? "Product"}
-                                width={400}
-                                height={240}
-                                className="h-48 w-full object-cover"
-                            />
-                        ) : (
-                            <div className="flex h-48 items-center justify-center bg-primary text-4xl font-bold text-white">
-                                {(product.name ?? "?")[0].toUpperCase()}
-                            </div>
-                        )}
+                      
                         <div className="divide-y divide-border p-0">
                             {[
                                 { label: "Category", value: getCategoryName(product.categoryId) },
