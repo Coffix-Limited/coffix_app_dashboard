@@ -101,7 +101,7 @@ export default function TransactionDetailPage() {
     setRefundLoading(true);
     try {
       const res = await fetch(
-        "http://127.0.0.1:5001/coffix-app-dev/us-central1/v1/transaction/refund",
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/transaction/refund`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
