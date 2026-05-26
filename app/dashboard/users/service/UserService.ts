@@ -19,6 +19,10 @@ export const UserService = {
       onUpdate(users);
     }),
 
-  updateUser: (docId: string, data: Partial<Omit<AppUser, "docId">>) =>
-    updateDoc(doc(db, "customers", docId), data as DocumentData),
+  updateUser: (docId: string, data: Partial<Omit<AppUser, "docId">>) => {
+    const clean = Object.fromEntries(
+      Object.entries(data).filter(([, v]) => v !== undefined)
+    );
+    return updateDoc(doc(db, "customers", docId), clean as DocumentData);
+  },
 };

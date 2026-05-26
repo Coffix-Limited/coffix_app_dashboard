@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useTransactionStore } from "../store/useTransactionStore";
 import { useUserStore } from "@/app/dashboard/users/store/useUserStore";
+import { useDashboardStore } from "@/app/dashboard/products/store/useDashboardStore";
 import { PaymentMethod } from "../interface/transaction";
 import { Item } from "../interface/order";
 import { formatDateTime } from "@/app/utils/formatting";
@@ -67,11 +68,17 @@ function PaymentMethodBadge({ method }: { method: PaymentMethod | null | undefin
   );
 }
 
-function formatModifiers(item: Item): string {
+function formatModifiers(
+  item: Item,
+  modifierMap: Record<string, string>,
+  modifierGroupMap: Record<string, string>,
+): string {
   if (!item.selectedModifiers) return "—";
   const entries = Object.entries(item.selectedModifiers);
   if (entries.length === 0) return "—";
-  return entries.map(([k, v]) => `${k}: ${v}`).join(", ");
+  return entries
+    .map(([k, v]) => `${modifierGroupMap[k] ?? k}: ${modifierMap[v] ?? v}`)
+    .join(", ");
 }
 
 export default function TransactionDetailPage() {
@@ -84,6 +91,14 @@ export default function TransactionDetailPage() {
   const transactions = useTransactionStore((s) => s.transactions);
   const orders = useTransactionStore((s) => s.orders);
   const users = useUserStore((s) => s.users);
+  const modifiers = useDashboardStore((s) => s.modifiers);
+  const modifierGroups = useDashboardStore((s) => s.modifierGroups);
+  const modifierMap = Object.fromEntries(
+    modifiers.filter((m) => m.docId).map((m) => [m.docId!, m.label ?? m.docId!])
+  );
+  const modifierGroupMap = Object.fromEntries(
+    modifierGroups.filter((g) => g.docId).map((g) => [g.docId!, g.name ?? g.docId!])
+  );
 
   const tx = transactions.find((t) => t.docId === transactionId);
 
@@ -288,7 +303,7 @@ export default function TransactionDetailPage() {
                         <td className="px-4 py-2 text-right text-black">
                           {item.price != null ? `$${item.price.toFixed(2)}` : "—"}
                         </td>
-                        <td className="px-4 py-2 text-black">{formatModifiers(item)}</td>
+                        <td className="px-4 py-2 text-black">{formatModifiers(item, modifierMap, modifierGroupMap)}</td>
                       </tr>
                     ))}
                   </tbody>
