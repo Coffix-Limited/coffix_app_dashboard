@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CouponService } from "../service/CouponService";
 import { Coupon } from "../interface/coupon";
@@ -15,41 +15,84 @@ interface AddCouponDialogProps {
   open: boolean;
   onClose: () => void;
   stores: Store[];
-  defaultEmail?: string;
+  userIds?: string[];
+  defaultEmails?: string[];
 }
 
-const EMPTY_FORM = { type: "", amount: "", expiryDate: "", storeId: "", customerEmail: "", notes: "" };
+const EMPTY_FORM = { type: "", amount: "", expiryDate: "", storeId: "", notes: "" };
 
-export function AddCouponDialog({ open, onClose, stores, defaultEmail }: AddCouponDialogProps) {
+export function AddCouponDialog({ open, onClose, stores, userIds, defaultEmails }: AddCouponDialogProps) {
   const [form, setForm] = useState(EMPTY_FORM);
+  const [customerEmails, setCustomerEmails] = useState<string[]>([]);
+  const [emailInput, setEmailInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const emailInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
-      setForm({ ...EMPTY_FORM, customerEmail: defaultEmail ?? "" });
+      setForm(EMPTY_FORM);
+      setCustomerEmails(defaultEmails ?? []);
+      setEmailInput("");
     }
-  }, [open, defaultEmail]);
+  }, [open, defaultEmails]);
 
   function setField<K extends keyof typeof form>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
+  function addEmail() {
+    const email = emailInput.trim();
+    if (!email) return;
+    if (!customerEmails.includes(email)) {
+      setCustomerEmails((prev) => [...prev, email]);
+    }
+    setEmailInput("");
+    emailInputRef.current?.focus();
+  }
+
+  function removeEmail(email: string) {
+    setCustomerEmails((prev) => prev.filter((e) => e !== email));
+  }
+
+  function handleEmailKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addEmail();
+    }
+  }
+
   async function handleCreate() {
     setLoading(true);
     try {
-      const data: Omit<Coupon, "docId"> = { createdAt: new Date() };
-      if (form.type.trim()) data.type = form.type.trim();
+      const base: Omit<Coupon, "docId"> = { createdAt: new Date() };
+      if (form.type.trim()) base.type = form.type.trim();
       const amt = parseFloat(form.amount);
-      if (!isNaN(amt) && amt >= 0) data.amount = amt;
+      if (!isNaN(amt) && amt >= 0) base.amount = amt;
       if (form.expiryDate) {
         const d = new Date(form.expiryDate + "T00:00:00");
-        if (!isNaN(d.getTime())) data.expiryDate = d;
+        if (!isNaN(d.getTime())) base.expiryDate = d;
       }
-      if (form.storeId) data.storeId = form.storeId;
-      if (form.customerEmail.trim()) data.customerEmail = form.customerEmail.trim();
-      if (form.notes.trim()) data.notes = form.notes.trim();
-      await CouponService.createCoupon(data);
-      toast.success("Coupon created.");
+      if (form.storeId) base.storeId = form.storeId;
+      if (form.notes.trim()) base.notes = form.notes.trim();
+
+      if (userIds && userIds.length > 0) {
+        await Promise.all(
+          userIds.map((userId, i) =>
+            CouponService.createCoupon({
+              ...base,
+              userId,
+              ...(customerEmails[i] ? { customerEmail: customerEmails[i] } : {}),
+            })
+          )
+        );
+        toast.success(`${userIds.length} coupon(s) created.`);
+      } else {
+        await CouponService.createCoupon({
+          ...base,
+          ...(customerEmails[0] ? { customerEmail: customerEmails[0] } : {}),
+        });
+        toast.success("Coupon created.");
+      }
       onClose();
     } catch {
       toast.error("Failed to create coupon.");
@@ -123,13 +166,41 @@ export function AddCouponDialog({ open, onClose, stores, defaultEmail }: AddCoup
             </div>
             <div className="col-span-2">
               <label className="mb-1.5 block text-xs text-light-grey">Customer Email</label>
-              <input
-                type="email"
-                placeholder="customer@example.com"
-                className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none placeholder:text-light-grey focus:border-primary"
-                value={form.customerEmail}
-                onChange={(e) => setField("customerEmail", e.target.value)}
-              />
+              <div className="min-h-[42px] flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-2 focus-within:border-primary">
+                {customerEmails.map((email) => (
+                  <span
+                    key={email}
+                    className="flex items-center gap-1 rounded-md bg-background border border-border px-2 py-0.5 text-xs text-black"
+                  >
+                    {email}
+                    <button
+                      type="button"
+                      onClick={() => removeEmail(email)}
+                      className="ml-0.5 text-light-grey hover:text-black leading-none"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <div className="flex flex-1 items-center gap-1 min-w-[140px]">
+                  <input
+                    ref={emailInputRef}
+                    type="email"
+                    placeholder={customerEmails.length === 0 ? "customer@example.com" : ""}
+                    className="flex-1 text-sm text-black outline-none placeholder:text-light-grey bg-transparent"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    onKeyDown={handleEmailKeyDown}
+                  />
+                  <button
+                    type="button"
+                    onClick={addEmail}
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-primary text-white text-xs font-bold hover:opacity-90"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
             </div>
             <div className="col-span-2">
               <label className="mb-1.5 block text-xs text-light-grey">Notes</label>

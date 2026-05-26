@@ -685,7 +685,8 @@ export default function UsersPage() {
         open={showAddCoupon}
         onClose={() => setShowAddCoupon(false)}
         stores={stores}
-        defaultEmail={selectedIds.size === 1 ? users.find((u) => u.docId === Array.from(selectedIds)[0])?.email : undefined}
+        userIds={Array.from(selectedIds)}
+        defaultEmails={Array.from(selectedIds).map((id) => users.find((u) => u.docId === id)?.email ?? "").filter(Boolean)}
       />
     </div>
   );
