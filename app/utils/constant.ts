@@ -1,7 +1,7 @@
 import { EmailVariableGroup } from "../dashboard/emailTemplates/constants/emailVariables";
 
 const COLLECTION_GLOBAL_SETTINGS = "EQ0i4V6H47Ra7yMCdG7B";
-const WEBAPP_VERSION = "1.0.0+49";
+const WEBAPP_VERSION = "1.0.0+50";
 
 export const EMAIL_VARIABLE_GROUPS: EmailVariableGroup[] = [
   {
@@ -39,14 +39,13 @@ export const EMAIL_VARIABLE_GROUPS: EmailVariableGroup[] = [
   {
     key: "transaction",
     label: "Transaction",
-    variables: ["invoice", "gift_amount", "transaction_number", "store_name" ],
+    variables: ["invoice", "gift_amount", "transaction_number", "store_name"],
   },
   {
     key: "referral",
     label: "Referral",
     variables: ["referee_name"],
   },
- 
 ];
 
 export const SUBJECT_VARIABLES = ["transaction_number", "store_name"];

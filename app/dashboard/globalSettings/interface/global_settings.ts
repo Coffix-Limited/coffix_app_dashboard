@@ -10,6 +10,7 @@ export interface GlobalSettings {
   specialUrl?: string;
   storeUrl?: string;
   tcUrl?: string;
+  topupLevel1?: number;
   topupLevel2?: number;
   topupLevel3?: number;
   withdrawalFee?: number;

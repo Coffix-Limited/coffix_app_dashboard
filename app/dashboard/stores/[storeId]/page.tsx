@@ -32,7 +32,7 @@ const REQUIRED: (keyof Omit<StoreEditForm, "openingHours">)[] = [
   "name", "email", "contactNumber", "location", "address", "printerId",
 ];
 
-type DialogMode = "edit-store" | "add-holiday" | "edit-holiday" | "delete-holiday" | null;
+type DialogMode = "edit-store" | "add-holiday" | "edit-holiday" | "delete-holiday" | "delete-store" | null;
 
 type HolidayForm = {
   date: string;
@@ -168,6 +168,21 @@ export default function StoreDetailPage() {
     }
   }
 
+  async function handleDeleteStore() {
+    if (!store) return;
+    setLoading(true);
+    try {
+      await StoreService.deleteStore(store.docId);
+      toast.success("Store deleted.");
+      router.push("/dashboard/stores");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete store. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleDeleteHoliday() {
     if (!store || !editingDate) return;
     const updatedMap: Record<string, HolidayHours> = { ...store.holidayHours };
@@ -285,12 +300,20 @@ export default function StoreDetailPage() {
             )}
           </div>
         </div>
-        <Button
-          onClick={openEdit}
-          variant="outline"
-        >
-          Edit
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="destructive"
+            onClick={() => setDialog("delete-store")}
+          >
+            Delete
+          </Button>
+          <Button
+            onClick={openEdit}
+            variant="outline"
+          >
+            Edit
+          </Button>
+        </div>
       </div>
 
       {/* Store image — square to match 1200×1200 mobile app asset */}
@@ -708,6 +731,29 @@ export default function StoreDetailPage() {
                   disabled={loading}
                 >
                   {loading ? "Removing…" : "Remove"}
+                </Button>
+              </div>
+            </>
+          )}
+
+          {/* ── Delete Store ── */}
+          {dialog === "delete-store" && (
+            <>
+              <div className="border-b border-border px-6 py-4">
+                <h3 className="text-lg font-semibold text-black">Delete Store</h3>
+              </div>
+              <div className="px-6 py-4">
+                <p className="text-sm text-black">
+                  Are you sure you want to delete{" "}
+                  <span className="font-medium">{store.name}</span>? This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
+                <Button variant="outline" onClick={closeDialog} disabled={loading}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={handleDeleteStore} disabled={loading}>
+                  {loading ? "Deleting…" : "Delete Store"}
                 </Button>
               </div>
             </>

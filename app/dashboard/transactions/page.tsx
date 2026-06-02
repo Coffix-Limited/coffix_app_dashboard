@@ -12,7 +12,7 @@ import { useAuth } from "@/app/lib/AuthContext";
 import { toast } from "sonner";
 import { TransactionService } from "./service/TransactionService";
 import { TransactionsFilterBar } from "./components/TransactionsFilterBar";
-import { StatusChip, StatusChipColor } from "@/components/ui/StatusChip";
+import { EnumChip } from "@/components/ui/StatusChip";
 
 type DateRange = { from: string; to: string };
 type NumberRange = { min: string; max: string };
@@ -31,36 +31,6 @@ function dateInRange(value: Date | undefined, from: string, to: string): boolean
     if (d > toEnd) return false;
   }
   return true;
-}
-
-function PaymentMethodBadge({ method }: { method: PaymentMethod | null | undefined }) {
-  if (!method) return <span className="text-black">—</span>;
-  const styles: Partial<Record<PaymentMethod, string>> = {
-    coffixCredit: "bg-primary text-white",
-    card: "bg-black text-white",
-  };
-  const labels: Partial<Record<PaymentMethod, string>> = {
-    coffixCredit: "Coffix Credit",
-    card: "Credit Card",
-  };
-  if (!styles[method] || !labels[method]) return <span className="text-black">—</span>;
-  return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${styles[method]}`}>
-      {labels[method]}
-    </span>
-  );
-}
-
-function statusColor(status: Transaction["status"]): StatusChipColor {
-  switch (status) {
-    case "paid":
-    case "approved":
-    case "completed": return "green";
-    case "failed":
-    case "declined":  return "red";
-    case "created":   return "yellow";
-    default:          return "grey";
-  }
 }
 
 type SortKey = "createdAt" | "transactionNumber";
@@ -183,6 +153,14 @@ export default function TransactionsPage() {
     const types = new Set<string>();
     transactions.forEach((tx) => { if (tx.type) types.add(tx.type); });
     return Array.from(types).sort();
+  }, [transactions]);
+
+  const refundedTxNums = useMemo(() => {
+    return new Set(
+      transactions
+        .filter((t) => t.type === "refund" && t.originalTransactionNumber)
+        .map((t) => t.originalTransactionNumber!)
+    );
   }, [transactions]);
 
   const displayed = useMemo(() => {
@@ -362,20 +340,22 @@ export default function TransactionsPage() {
                     />
                   </td>
                   <td className="px-5 py-3 font-mono text-black">
-                    {tx.transactionNumber ?? "—"}
+                    <div className="flex items-center gap-2">
+                      {tx.transactionNumber ?? "—"}
+                    </div>
                   </td>
                   <td className="px-5 py-3 text-black">{formatDateTime(tx.createdAt)}</td>
                   <td className="px-5 py-3">
-                    <PaymentMethodBadge method={tx.paymentMethod} />
+                    <EnumChip domain="paymentMethod" value={tx.paymentMethod} />
                   </td>
-                  <td className="px-5 py-3 text-black">{tx.type ?? "—"}</td>
+                  <td className="px-5 py-3">
+                    <EnumChip domain="transactionType" value={tx.type} />
+                  </td>
                   <td className="px-5 py-3 text-black">
                     {tx.amount != null ? `$${tx.amount.toFixed(2)}` : "—"}
                   </td>
                   <td className="px-5 py-3">
-                    {tx.status
-                      ? <StatusChip label={tx.status} color={statusColor(tx.status)} />
-                      : <span className="text-black">—</span>}
+                    <EnumChip domain="transactionStatus" value={tx.status} />
                   </td>
                   <td className="px-5 py-3 text-black">{getCustomerEmail(tx)}</td>
                 </tr>

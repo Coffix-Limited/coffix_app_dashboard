@@ -1,5 +1,32 @@
 "use client";
 
+function isoToDdMmYyyy(iso: string): string {
+  if (!iso) return "";
+  const [yyyy, mm, dd] = iso.split("-");
+  if (!yyyy || !mm || !dd) return "";
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+function DateInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="relative h-7 w-full">
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ colorScheme: "light", color: "transparent" }}
+        className="absolute inset-0 w-full h-full bg-transparent text-sm outline-none cursor-pointer"
+      />
+      <span className="pointer-events-none absolute inset-0 flex items-center text-sm select-none pr-6">
+        {value
+          ? <span className="text-black">{isoToDdMmYyyy(value)}</span>
+          : <span className="text-light-grey text-xs">dd/mm/yyyy</span>
+        }
+      </span>
+    </div>
+  );
+}
+
 interface CouponsFilterBarProps {
   search: string; setSearch: (v: string) => void;
   typeFilter: string; setTypeFilter: (v: string) => void;
@@ -102,12 +129,7 @@ export function CouponsFilterBar({
             Expiry From
             {expiryFrom && <button onClick={() => setExpiryFrom("")} className="ml-1 text-light-grey hover:text-black">×</button>}
           </span>
-          <input
-            type="date"
-            value={expiryFrom}
-            onChange={(e) => setExpiryFrom(e.target.value)}
-            className="h-7 w-full bg-transparent text-sm text-black outline-none"
-          />
+          <DateInput value={expiryFrom} onChange={setExpiryFrom} />
         </div>
 
         {/* Expiry To */}
@@ -116,12 +138,7 @@ export function CouponsFilterBar({
             Expiry To
             {expiryTo && <button onClick={() => setExpiryTo("")} className="ml-1 text-light-grey hover:text-black">×</button>}
           </span>
-          <input
-            type="date"
-            value={expiryTo}
-            onChange={(e) => setExpiryTo(e.target.value)}
-            className="h-7 w-full bg-transparent text-sm text-black outline-none"
-          />
+          <DateInput value={expiryTo} onChange={setExpiryTo} />
         </div>
 
         {/* Amount Min */}

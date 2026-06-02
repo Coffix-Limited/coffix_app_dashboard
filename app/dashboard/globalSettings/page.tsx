@@ -37,6 +37,7 @@ type FormState = {
   specialUrl: string;
   storeUrl: string;
   tcUrl: string;
+  topupLevel1: string;
   topupLevel2: string;
   topupLevel3: string;
   withdrawalFee: string;
@@ -60,6 +61,7 @@ function settingsToForm(s: GlobalSettings): FormState {
     specialUrl: s.specialUrl ?? "",
     storeUrl: s.storeUrl ?? "",
     tcUrl: s.tcUrl ?? "",
+    topupLevel1: s.topupLevel1?.toString() ?? "",
     topupLevel2: s.topupLevel2?.toString() ?? "",
     topupLevel3: s.topupLevel3?.toString() ?? "",
     withdrawalFee: s.withdrawalFee?.toString() ?? "",
@@ -72,6 +74,7 @@ const NUMERIC_NON_NEGATIVE: (keyof FormState)[] = [
   "discountLevel2",
   "discountLevel3",
   "maxDayBetweenLogin",
+  "topupLevel1",
   "topupLevel2",
   "topupLevel3",
   "withdrawalFee",
@@ -97,6 +100,7 @@ const FIELD_LABELS: Record<keyof FormState, string> = {
   specialUrl: "Special URL",
   storeUrl: "Store URL",
   tcUrl: "T&C URL",
+  topupLevel1: "Top Up Level 1",
   topupLevel2: "Top Up Level 2",
   topupLevel3: "Top Up Level 3",
   withdrawalFee: "Withdrawal Fee",
@@ -304,6 +308,7 @@ const emptyForm: FormState = {
   specialUrl: "",
   storeUrl: "",
   tcUrl: "",
+  topupLevel1: "",
   topupLevel2: "",
   topupLevel3: "",
   withdrawalFee: "",
@@ -414,10 +419,19 @@ export default function GlobalSettingsPage() {
 
         <Section title="Coffix Credit TopUp Amount">
           <Field
-            label="Top Up Level 1"
+            label="Min Top Up"
             type="number"
             value={form.minTopUp}
             onChange={setField("minTopUp")}
+            placeholder="0.00"
+            prefix="$"
+            money
+          />
+          <Field
+            label="Top Up Level 1"
+            type="number"
+            value={form.topupLevel1}
+            onChange={setField("topupLevel1")}
             placeholder="0.00"
             prefix="$"
             money

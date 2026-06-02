@@ -415,7 +415,7 @@ export default function ProductDetailPage() {
                     onClick={() => setDialog(null)}
                 >
                     <div
-                        className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+                        className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Edit Product */}
@@ -482,6 +482,12 @@ export default function ProductDetailPage() {
                                         selected={productForm.availableToStores ?? []}
                                         onChange={(v) => setProductForm((f) => ({ ...f, availableToStores: v }))}
                                         showSelectAll
+                                    />
+                                    <MultiSelect
+                                        label="Modifier Groups (optional)"
+                                        options={modifierGroups.map((g) => ({ value: g.docId ?? "", label: g.name ?? g.docId ?? "" }))}
+                                        selected={productForm.modifierGroupIds ?? []}
+                                        onChange={(v) => setProductForm((f) => ({ ...f, modifierGroupIds: v }))}
                                     />
                                 </div>
                                 <div className="mt-5 flex justify-end gap-2">

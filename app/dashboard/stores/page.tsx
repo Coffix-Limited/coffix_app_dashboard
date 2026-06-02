@@ -13,6 +13,7 @@ import {
 } from "./constants/storeFieldConstants";
 import { escapeCSV, parseCSVText, triggerCSVDownload } from "@/app/utils/csvUtils";
 import { Button } from "@/components/ui/button";
+import { EnumChip } from "@/components/ui/StatusChip";
 import {
   Dialog,
   DialogContent,
@@ -151,6 +152,9 @@ export default function StoresPage() {
   }, [stores, search, statusFilter, sortKey, sortDir,
       filterEmail, filterContactNumber, filterLocation,
       filterAddress, filterStoreCode, filterPrinterId]);
+
+  const [deleteStoreId, setDeleteStoreId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<StoreForm>(emptyForm);
@@ -298,6 +302,21 @@ export default function StoresPage() {
     }
   }
 
+  async function handleDeleteStore() {
+    if (!deleteStoreId) return;
+    setDeleteLoading(true);
+    try {
+      await StoreService.deleteStore(deleteStoreId);
+      toast.success("Store deleted.");
+      setDeleteStoreId(null);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete store. Please try again.");
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
   async function handleCreate() {
     const newErrors = Object.fromEntries(
       REQUIRED.map((k) => [k, !(form[k] as string).trim()]),
@@ -415,12 +434,13 @@ export default function StoresPage() {
                 Status {sortKey === "status" ? (sortDir === "asc" ? "↑" : "↓") : <span className="opacity-30">↕</span>}
               </th>
               <th className="px-5 py-3 text-left font-medium text-light-grey">Disabled</th>
+              <th className="px-5 py-3 text-left font-medium text-light-grey">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {displayed.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-5 py-10 text-center text-light-grey">
+                <td colSpan={6} className="px-5 py-10 text-center text-light-grey">
                   No stores found.
                 </td>
               </tr>
@@ -461,13 +481,10 @@ export default function StoresPage() {
                     </td>
                     <td className="px-5 py-3 text-black">{store.printerId ?? "—"}</td>
                     <td className="px-5 py-3">
-                      <Button
-                        size="xs"
-                        variant={isDisabled ? "secondary" : isOpen ? "solid-success" : "destructive"}
-                        className="rounded-full pointer-events-none"
-                      >
-                        {isDisabled ? "Disabled" : isOpen ? "Open" : "Closed"}
-                      </Button>
+                      <EnumChip
+                        domain="storeStatus"
+                        value={isDisabled ? "Disabled" : isOpen ? "Open" : "Closed"}
+                      />
                     </td>
                     <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
                       <Button
@@ -477,6 +494,15 @@ export default function StoresPage() {
                         className="rounded-full"
                       >
                         {isDisabled ? "Disabled" : "Enabled"}
+                      </Button>
+                    </td>
+                    <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="xs"
+                        variant="destructive"
+                        onClick={() => setDeleteStoreId(store.docId)}
+                      >
+                        Delete
                       </Button>
                     </td>
                   </tr>
@@ -657,6 +683,30 @@ export default function StoresPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Store Confirmation Dialog */}
+      <Dialog open={deleteStoreId !== null} onOpenChange={(open) => { if (!open) setDeleteStoreId(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Store</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-black">
+            Are you sure you want to delete{" "}
+            <span className="font-medium">
+              {stores.find((s) => s.docId === deleteStoreId)?.name ?? "this store"}
+            </span>
+            ? This action cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteStoreId(null)} disabled={deleteLoading}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteStore} disabled={deleteLoading}>
+              {deleteLoading ? "Deleting…" : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* CSV Field Guide Dialog */}
       <Dialog open={showImportInfo} onOpenChange={setShowImportInfo}>

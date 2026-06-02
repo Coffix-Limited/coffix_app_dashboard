@@ -102,6 +102,10 @@ export default function TransactionDetailPage() {
 
   const tx = transactions.find((t) => t.docId === transactionId);
 
+  const isRefunded = !!tx && transactions.some(
+    (t) => t.type === "refund" && t.originalTransactionNumber === tx.transactionNumber
+  );
+
   if (!tx) {
     return (
       <div className="flex h-64 items-center justify-center text-light-grey">
@@ -170,15 +174,21 @@ export default function TransactionDetailPage() {
           <PaymentMethodBadge method={tx.paymentMethod} />
           {tx.type === "order" && (
             <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setRefundDialogOpen(true)}
-                disabled={refundLoading}
-                className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
-              >
-                {refundLoading ? "Refunding…" : "Refund Transaction"}
-              </Button>
+              {isRefunded ? (
+                <span className="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
+                  Refunded
+                </span>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRefundDialogOpen(true)}
+                  disabled={refundLoading}
+                  className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+                >
+                  {refundLoading ? "Refunding…" : "Refund Transaction"}
+                </Button>
+              )}
 
               <Dialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
                 <DialogContent className="max-w-sm">
@@ -229,11 +239,14 @@ export default function TransactionDetailPage() {
             { label: "Doc ID", value: tx.docId ?? "—", mono: true },
             { label: "Type", value: tx.type ?? "—" },
             { label: "Status", value: tx.status ?? "—" },
+            ...(tx.type === "order"
+              ? [{ label: "Refund Status", value: isRefunded ? "Refunded" : "Not Refunded" }]
+              : []),
             { label: "Amount", value: tx.amount != null ? `$${tx.amount.toFixed(2)}` : "—" },
             { label: "Total Amount", value: tx.totalAmount != null ? `$${tx.totalAmount.toFixed(2)}` : "—" },
-            { label: "GST", value: tx.gst != null ? `${tx.gst}%` : "—" },
-            { label: "GST Amount", value: tx.gstAmount != null ? `$${tx.gstAmount.toFixed(2)}` : "—" },
-            { label: "GST Number", value: tx.gstNumber != null ? String(tx.gstNumber) : "—" },
+            { label: "GST", value: tx.paymentMethod === "coffixCredit" ? "" : tx.gst != null ? `${tx.gst}%` : "—" },
+            { label: "GST Amount", value: tx.paymentMethod === "coffixCredit" ? "" : tx.gstAmount != null ? `$${tx.gstAmount.toFixed(2)}` : "—" },
+            { label: "GST Number", value: tx.paymentMethod === "coffixCredit" ? "" : tx.gstNumber != null ? String(tx.gstNumber) : "—" },
             { label: "Windcave Session Id", value: tx.paymentId ?? "—", mono: true },
             { label: "Payment Time", value: formatDateTime(tx.paymentTime) },
             { label: "Created At", value: formatDateTime(tx.createdAt) },
