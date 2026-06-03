@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useUserStore } from "./store/useUserStore";
 import { useStoreStore } from "@/app/dashboard/stores/store/useStoreStore";
 import { UserService } from "./service/UserService";
+import { AppUser } from "./interface/user";
 import {
   USER_PROTECTED_FIELDS,
   USER_IMPORTABLE_FIELDS,
@@ -21,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { UsersFilterBar } from "./components/UsersFilterBar";
 import { AddCouponDialog } from "@/app/dashboard/coupons/components/AddCouponDialog";
+import BulkUpdateFlagsDialog, { type FlagKey } from "./components/BulkUpdateFlagsDialog";
 
 function dateInRange(value: Date | undefined, from: string, to: string): boolean {
   if (!from && !to) return true;
@@ -36,6 +38,32 @@ function dateInRange(value: Date | undefined, from: string, to: string): boolean
     if (d > toEnd) return false;
   }
   return true;
+}
+
+function toMillis(value: unknown): number {
+  if (value === undefined || value === null) return 0;
+  // Firestore Timestamp instance
+  if (typeof (value as { toDate?: () => Date }).toDate === "function") {
+    const t = (value as { toDate: () => Date }).toDate().getTime();
+    return isNaN(t) ? 0 : t;
+  }
+  // Real Date
+  if (value instanceof Date) {
+    const t = value.getTime();
+    return isNaN(t) ? 0 : t;
+  }
+  // Serialized Timestamp: { seconds, nanoseconds } or { _seconds, _nanoseconds }
+  if (typeof value === "object") {
+    const o = value as { seconds?: number; _seconds?: number };
+    const seconds = o.seconds ?? o._seconds;
+    if (typeof seconds === "number") return seconds * 1000;
+  }
+  // ISO string / number
+  if (typeof value === "string" || typeof value === "number") {
+    const t = new Date(value).getTime();
+    return isNaN(t) ? 0 : t;
+  }
+  return 0;
 }
 
 function getDisplayName(user: { firstName?: string; lastName?: string; nickName?: string }): string {
@@ -85,6 +113,11 @@ function IndeterminateCheckbox({
   );
 }
 
+const FLAG_KEYS: FlagKey[] = [
+  "getPurchaseInfoByMail", "getPromotions", "allowWinACoffee",
+  "disabled", "scheduleOrder", "shareCredit", "withdrawBalance", "coffixCreditAvailable",
+];
+
 export default function UsersPage() {
   const users = useUserStore((s) => s.users);
   const stores = useStoreStore((s) => s.stores);
@@ -121,6 +154,7 @@ export default function UsersPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showAddCredits, setShowAddCredits] = useState(false);
   const [showAddCoupon, setShowAddCoupon] = useState(false);
+  const [showBulkFlags, setShowBulkFlags] = useState(false);
   const [creditAmount, setCreditAmount] = useState("");
   const [creditLoading, setCreditLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
@@ -235,6 +269,9 @@ export default function UsersPage() {
       return true;
     });
     result = [...result].sort((a, b) => {
+      const aTime = toMillis(a.createdAt);
+      const bTime = toMillis(b.createdAt);
+      if (bTime !== aTime) return bTime - aTime;
       const cmp = getDisplayName(a).localeCompare(getDisplayName(b));
       return sortDir === "asc" ? cmp : -cmp;
     });
@@ -246,6 +283,19 @@ export default function UsersPage() {
     filterCreditExpiry, filterEmailVerified, filterGetPurchaseInfoByMail,
     filterGetPromotions, filterAllowWinACoffee, filterDisabled, filterCreditAvailable,
   ]);
+
+  const bulkInitialFlags = useMemo(() => {
+    const selected = Array.from(selectedIds)
+      .map((id) => users.find((u) => u.docId === id))
+      .filter(Boolean) as AppUser[];
+    if (selected.length === 0) return {} as Partial<Record<FlagKey, boolean>>;
+    const result: Partial<Record<FlagKey, boolean>> = {};
+    for (const key of FLAG_KEYS) {
+      const trueCount = selected.filter((u) => u[key] === true).length;
+      result[key] = trueCount > selected.length / 2;
+    }
+    return result;
+  }, [selectedIds, users]);
 
   const allSelected = filtered.length > 0 && filtered.every((u) => selectedIds.has(u.docId!));
   const someSelected = !allSelected && filtered.some((u) => selectedIds.has(u.docId!));
@@ -397,6 +447,14 @@ export default function UsersPage() {
     }
   }
 
+  async function handleBulkUpdateFlags(flags: Partial<AppUser>) {
+    await Promise.all(
+      Array.from(selectedIds).map((docId) =>
+        UserService.updateUser(docId, flags)
+      )
+    );
+  }
+
   async function handleAddCredits() {
     const amount = parseFloat(creditAmount);
     if (isNaN(amount) || amount <= 0) {
@@ -497,6 +555,12 @@ export default function UsersPage() {
             onClick={() => setShowAddCoupon(true)}
           >
             Add Coupon
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setShowBulkFlags(true)}
+          >
+            Update Flags
           </Button>
           <Button
             size="sm"
@@ -687,6 +751,15 @@ export default function UsersPage() {
         stores={stores}
         userIds={Array.from(selectedIds)}
         defaultEmails={Array.from(selectedIds).map((id) => users.find((u) => u.docId === id)?.email ?? "").filter(Boolean)}
+      />
+
+      <BulkUpdateFlagsDialog
+        key={showBulkFlags ? "open" : "closed"}
+        open={showBulkFlags}
+        onClose={() => setShowBulkFlags(false)}
+        selectedCount={selectedIds.size}
+        initialFlags={bulkInitialFlags}
+        onSave={handleBulkUpdateFlags}
       />
     </div>
   );

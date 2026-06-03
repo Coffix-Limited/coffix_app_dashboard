@@ -7,6 +7,31 @@ import { formatDateTime } from "@/app/utils/formatting";
 import { useUserStore } from "@/app/dashboard/users/store/useUserStore";
 import { escapeCSV, tsToISO, triggerCSVDownload } from "@/app/utils/csvUtils";
 import { Button } from "@/components/ui/button";
+import { LogsFilterBar } from "./components/LogsFilterBar";
+
+type DateRange = { from: string; to: string };
+
+function dateInRange(value: Date | undefined, from: string, to: string): boolean {
+  if (!from && !to) return true;
+  if (value === undefined || value === null) return false;
+  const d: Date =
+    typeof (value as unknown as { toDate?: () => Date }).toDate === "function"
+      ? (value as unknown as { toDate: () => Date }).toDate()
+      : (value as Date);
+  if (from && d < new Date(from)) return false;
+  if (to) {
+    const toEnd = new Date(to);
+    toEnd.setHours(23, 59, 59, 999);
+    if (d > toEnd) return false;
+  }
+  return true;
+}
+
+function uniqueValues(logs: Log[], selector: (log: Log) => string | undefined): string[] {
+  return Array.from(
+    new Set(logs.map(selector).filter((v): v is string => !!v && v.trim() !== ""))
+  ).sort();
+}
 
 const SEVERITY_STYLES: Record<string, string> = {
   error: "bg-red-100 text-red-700",
@@ -35,17 +60,60 @@ export default function LogsPage() {
   const logs = useLogStore((s) => s.logs);
   const users = useUserStore((s) => s.users);
   const [search, setSearch] = useState("");
+  const [filterCategory, setFilterCategory] = useState("All");
+  const [filterAction, setFilterAction] = useState("All");
+  const [filterSeverity, setFilterSeverity] = useState("");
+  const [filterPage, setFilterPage] = useState("");
+  const [filterNotes, setFilterNotes] = useState("");
+  const [filterTime, setFilterTime] = useState<DateRange>({ from: "", to: "" });
 
   const userEmailMap = useMemo(
     () => new Map(users.map((u) => [u.docId, u.email])),
     [users]
   );
 
+  const uniqueCategories = useMemo(() => uniqueValues(logs, (l) => l.category), [logs]);
+  const uniqueActions = useMemo(() => uniqueValues(logs, (l) => l.action), [logs]);
+
+  const anyFilterActive = useMemo(
+    () =>
+      search.trim() !== "" ||
+      filterCategory !== "All" ||
+      filterAction !== "All" ||
+      filterSeverity.trim() !== "" ||
+      filterPage.trim() !== "" ||
+      filterNotes.trim() !== "" ||
+      filterTime.from !== "" ||
+      filterTime.to !== "",
+    [search, filterCategory, filterAction, filterSeverity, filterPage, filterNotes, filterTime]
+  );
+
+  function clearAllFilters() {
+    setSearch("");
+    setFilterCategory("All");
+    setFilterAction("All");
+    setFilterSeverity("");
+    setFilterPage("");
+    setFilterNotes("");
+    setFilterTime({ from: "", to: "" });
+  }
+
   const displayed = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return logs;
-    return logs.filter((log) => matches(log, q, userEmailMap));
-  }, [logs, search, userEmailMap]);
+    const severity = filterSeverity.trim().toLowerCase();
+    const page = filterPage.trim().toLowerCase();
+    const notes = filterNotes.trim().toLowerCase();
+    return logs.filter((log) => {
+      if (q && !matches(log, q, userEmailMap)) return false;
+      if (filterCategory !== "All" && log.category !== filterCategory) return false;
+      if (filterAction !== "All" && log.action !== filterAction) return false;
+      if (severity && !(log.severityLevel ?? "").toLowerCase().includes(severity)) return false;
+      if (page && !(log.page ?? "").toLowerCase().includes(page)) return false;
+      if (notes && !(log.notes ?? "").toLowerCase().includes(notes)) return false;
+      if (!dateInRange(log.time, filterTime.from, filterTime.to)) return false;
+      return true;
+    });
+  }, [logs, search, filterCategory, filterAction, filterSeverity, filterPage, filterNotes, filterTime, userEmailMap]);
 
   function exportToCSV() {
     const headers = ["docId", "time", "page", "category", "severityLevel", "action", "notes", "customerId", "userId"];
@@ -79,12 +147,18 @@ export default function LogsPage() {
         </Button>
       </div>
 
-      <input
-        type="text"
-        placeholder="Search by action, category, page, notes…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm text-black outline-none placeholder:text-light-grey focus:border-primary sm:max-w-xs"
+      <LogsFilterBar
+        search={search} setSearch={setSearch}
+        filterCategory={filterCategory} setFilterCategory={setFilterCategory}
+        categories={uniqueCategories}
+        filterAction={filterAction} setFilterAction={setFilterAction}
+        actions={uniqueActions}
+        filterSeverity={filterSeverity} setFilterSeverity={setFilterSeverity}
+        filterPage={filterPage} setFilterPage={setFilterPage}
+        filterNotes={filterNotes} setFilterNotes={setFilterNotes}
+        filterTime={filterTime} setFilterTime={setFilterTime}
+        anyFilterActive={anyFilterActive}
+        clearAllFilters={clearAllFilters}
       />
 
       <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">

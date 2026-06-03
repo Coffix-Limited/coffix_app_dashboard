@@ -20,4 +20,13 @@ export interface GlobalSettings {
   couponExpiryDays?: number;
   aboutUrl?: string;
 
+  // Default flags that will be query when creating new user
+  defScheduleOrder?: boolean;
+  defShareCredit?: boolean;
+  defWithdrawBalance?: boolean;
+  defCoffixCreditAvailable?: boolean;
+  defGetPurchaseInfoByMail?: boolean;
+  defGetPromotions?: boolean;
+  defAllowWinACoffee?: boolean;
+  defAllowCoffeeForHome?: boolean;
 }

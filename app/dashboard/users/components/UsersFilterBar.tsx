@@ -1,6 +1,7 @@
 "use client";
 
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { DateInput } from "@/components/ui/DateInput";
 
 type BoolFilter = "Any" | "Yes" | "No";
 type DateRange = { from: string; to: string };
@@ -29,33 +30,6 @@ interface UsersFilterBarProps {
   filterCreditAvailable: NumberRange; setFilterCreditAvailable: (v: NumberRange | ((p: NumberRange) => NumberRange)) => void;
   anyFilterActive: boolean;
   clearAllFilters: () => void;
-}
-
-function isoToDdMmYyyy(iso: string): string {
-  if (!iso) return "";
-  const [yyyy, mm, dd] = iso.split("-");
-  if (!yyyy || !mm || !dd) return "";
-  return `${dd}/${mm}/${yyyy}`;
-}
-
-function DateInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="relative h-7 w-full">
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        style={{ colorScheme: "light", color: "transparent" }}
-        className="absolute inset-0 w-full h-full bg-transparent text-sm outline-none cursor-pointer"
-      />
-      <span className="pointer-events-none absolute inset-0 flex items-center text-sm select-none pr-6">
-        {value
-          ? <span className="text-black">{isoToDdMmYyyy(value)}</span>
-          : <span className="text-light-grey text-xs">dd/mm/yyyy</span>
-        }
-      </span>
-    </div>
-  );
 }
 
 export function UsersFilterBar({

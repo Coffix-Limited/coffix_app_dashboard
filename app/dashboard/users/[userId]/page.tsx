@@ -8,7 +8,8 @@ import { useUserStore } from "../store/useUserStore";
 import { useStoreStore } from "@/app/dashboard/stores/store/useStoreStore";
 import { UserService } from "@/app/dashboard/users/service/UserService";
 import { AppUser } from "../interface/user";
-import { formatDate, formatDateTime } from "@/app/utils/formatting";
+import { formatDate, formatDateTime } from "@/app/utils/formatting"
+import { Switch } from "@/components/ui/switch";
 // ─── Formatting helpers ───────────────────────────────────────────────────────
 
 function formatBool(value: boolean | undefined): string {
@@ -78,6 +79,8 @@ type UserEditForm = {
   scheduleOrder: boolean;
   shareCredit: boolean;
   withdrawBalance: boolean;
+  coffixCreditAvailable: boolean;
+  allowCoffeeForHome: boolean;
 };
 
 type DialogMode = "edit-user" | null;
@@ -105,6 +108,8 @@ function userToForm(user: AppUser): UserEditForm {
     scheduleOrder: user.scheduleOrder ?? false,
     shareCredit: user.shareCredit ?? false,
     withdrawBalance: user.withdrawBalance ?? false,
+    coffixCreditAvailable: user.coffixCreditAvailable ?? false,
+    allowCoffeeForHome: user.allowCoffeeForHome ?? false,
   };
 }
 
@@ -200,6 +205,8 @@ export default function UserDetailPage() {
         scheduleOrder: form.scheduleOrder,
         shareCredit: form.shareCredit,
         withdrawBalance: form.withdrawBalance,
+        coffixCreditAvailable: form.coffixCreditAvailable,
+        allowCoffeeForHome: form.allowCoffeeForHome,
       });
       toast.success("User updated successfully.");
       closeDialog();
@@ -309,6 +316,8 @@ export default function UserDetailPage() {
             { label: "Schedule Order", value: formatBool(user.scheduleOrder) },
             { label: "Share Credit", value: formatBool(user.shareCredit) },
             { label: "Withdraw Balance", value: formatBool(user.withdrawBalance) },
+            { label: "Coffix Credit Available", value: formatBool(user.coffixCreditAvailable) },
+            { label: "Allow Coffee for Home", value: formatBool(user.allowCoffeeForHome) },
           ]}
         />
 
@@ -478,15 +487,15 @@ export default function UserDetailPage() {
                       { key: "scheduleOrder", label: "Schedule Order" },
                       { key: "shareCredit", label: "Share Credit" },
                       { key: "withdrawBalance", label: "Withdraw Balance" },
+                      { key: "coffixCreditAvailable", label: "Coffix Credit Available" },
+                      { key: "allowCoffeeForHome", label: "Allow Coffee for Home" },
                     ] as { key: keyof UserEditForm; label: string }[]
                   ).map(({ key, label }) => (
                     <label key={key} className="flex cursor-pointer items-center justify-between px-3 py-2.5 hover:bg-[#fafafa]">
                       <span className="text-sm text-black">{label}</span>
-                      <input
-                        type="checkbox"
+                      <Switch
                         checked={form[key] as boolean}
-                        onChange={(e) => setField(key, e.target.checked)}
-                        className="accent-primary"
+                        onCheckedChange={(checked) => setField(key, checked)}
                       />
                     </label>
                   ))}

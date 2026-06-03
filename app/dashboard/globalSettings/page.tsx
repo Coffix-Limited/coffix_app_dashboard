@@ -314,21 +314,69 @@ const emptyForm: FormState = {
   withdrawalFee: "",
 };
 
+type FlagsState = {
+  defScheduleOrder: boolean;
+  defShareCredit: boolean;
+  defWithdrawBalance: boolean;
+  defCoffixCreditAvailable: boolean;
+  defGetPurchaseInfoByMail: boolean;
+  defGetPromotions: boolean;
+  defAllowWinACoffee: boolean;
+  defAllowCoffeeForHome: boolean;
+};
+
+const emptyFlags: FlagsState = {
+  defScheduleOrder: false,
+  defShareCredit: false,
+  defWithdrawBalance: false,
+  defCoffixCreditAvailable: false,
+  defGetPurchaseInfoByMail: false,
+  defGetPromotions: false,
+  defAllowWinACoffee: false,
+  defAllowCoffeeForHome: false,
+};
+
+const FLAG_META: { key: keyof FlagsState; label: string; description: string }[] = [
+  { key: "defScheduleOrder", label: "Schedule Order", description: "Allow users to schedule orders by default" },
+  { key: "defShareCredit", label: "Share Credit", description: "Allow users to share credits by default" },
+  { key: "defWithdrawBalance", label: "Withdraw Balance", description: "Allow users to withdraw balance by default" },
+  { key: "defCoffixCreditAvailable", label: "Coffix Credit Available", description: "Enable Coffix credit for new users by default" },
+  { key: "defGetPurchaseInfoByMail", label: "Get Purchase Info by Mail", description: "Send purchase receipts by email by default" },
+  { key: "defGetPromotions", label: "Get Promotions", description: "Subscribe to promotions by default" },
+  { key: "defAllowWinACoffee", label: "Allow Win a Coffee", description: "Enable \"Win a Coffee\" feature by default" },
+  { key: "defAllowCoffeeForHome", label: "Allow Coffee for Home", description: "Enable \"Coffee for Home\" feature by default" },
+];
+
 export default function GlobalSettingsPage() {
   const settings = useGlobalSettingsStore((s) => s.settings);
 
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [flags, setFlags] = useState<FlagsState>(emptyFlags);
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   useEffect(() => {
     if (settings) {
       setForm(settingsToForm(settings));
+      setFlags({
+        defScheduleOrder: settings.defScheduleOrder ?? false,
+        defShareCredit: settings.defShareCredit ?? false,
+        defWithdrawBalance: settings.defWithdrawBalance ?? false,
+        defCoffixCreditAvailable: settings.defCoffixCreditAvailable ?? false,
+        defGetPurchaseInfoByMail: settings.defGetPurchaseInfoByMail ?? false,
+        defGetPromotions: settings.defGetPromotions ?? false,
+        defAllowWinACoffee: settings.defAllowWinACoffee ?? false,
+        defAllowCoffeeForHome: settings.defAllowCoffeeForHome ?? false,
+      });
     }
   }, [settings]);
 
   function setField(field: keyof FormState) {
     return (v: string) => setForm((f) => ({ ...f, [field]: v }));
+  }
+
+  function setFlag(key: keyof FlagsState) {
+    return (v: boolean) => setFlags((f) => ({ ...f, [key]: v }));
   }
 
   async function handleSave() {
@@ -340,7 +388,7 @@ export default function GlobalSettingsPage() {
 
     setLoading(true);
     try {
-      await GlobalSettingsService.updateSettings(formToPayload(form));
+      await GlobalSettingsService.updateSettings({ ...formToPayload(form), ...flags });
       toast.success("Settings saved.");
     } catch (err) {
       console.error(err);
@@ -527,6 +575,18 @@ export default function GlobalSettingsPage() {
             onChange={setField("appVersion")}
             placeholder="1.0.0"
           />
+        </Section>
+
+        <Section title="Default User Flags">
+          {FLAG_META.map(({ key, label, description }) => (
+            <ToggleField
+              key={key}
+              label={label}
+              description={description}
+              checked={flags[key]}
+              onChange={setFlag(key)}
+            />
+          ))}
         </Section>
 
         <Section title="URLs">
