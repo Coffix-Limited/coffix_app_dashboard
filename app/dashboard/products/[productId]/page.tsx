@@ -70,6 +70,7 @@ export default function ProductDetailPage() {
 
     const products = useDashboardStore((s) => s.products);
     const modifierGroups = useDashboardStore((s) => s.modifierGroups);
+    const categories = useDashboardStore((s) => s.categories);
     const getCategoryName = useDashboardStore((s) => s.getCategoryName);
     const stores = useStoreStore((s) => s.stores);
 
@@ -430,6 +431,19 @@ export default function ProductDetailPage() {
                                             value={(productForm.name as string) ?? ""}
                                             onChange={(e) => setProductForm((f) => ({ ...f, name: e.target.value }))}
                                         />
+                                    </div>
+                                    <div>
+                                        <label className="mb-1 block text-xs text-black capitalize">Category</label>
+                                        <select
+                                            className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
+                                            value={productForm.categoryId ?? ""}
+                                            onChange={(e) => setProductForm((f) => ({ ...f, categoryId: e.target.value }))}
+                                        >
+                                            <option value="">— Select category —</option>
+                                            {categories.map((c) => (
+                                                <option key={c.docId} value={c.docId}>{c.name}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                     <ImageUploadField
                                         value={(productForm.imageUrl as string) ?? ""}

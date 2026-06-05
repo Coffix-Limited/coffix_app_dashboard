@@ -33,16 +33,16 @@ function uniqueValues(logs: Log[], selector: (log: Log) => string | undefined): 
   ).sort();
 }
 
-const SEVERITY_STYLES: Record<string, string> = {
-  error: "bg-red-100 text-red-700",
-  warning: "bg-yellow-100 text-yellow-700",
-  info: "bg-blue-100 text-blue-700",
-  success: "bg-green-100 text-green-700",
+const SEVERITY_STYLES: Record<number, string> = {
+  1: "bg-blue-100 text-blue-700",
+  3: "bg-yellow-100 text-yellow-700",
+  5: "bg-orange-100 text-orange-700",
+  9: "bg-red-100 text-red-700",
 };
 
-function SeverityBadge({ level }: { level?: string }) {
-  if (!level) return <span className="text-light-grey">—</span>;
-  const style = SEVERITY_STYLES[level.toLowerCase()] ?? "bg-gray-100 text-gray-500";
+function SeverityBadge({ level }: { level?: number }) {
+  if (level === undefined || level === null) return <span className="text-light-grey">—</span>;
+  const style = SEVERITY_STYLES[level] ?? "bg-gray-100 text-gray-500";
   return (
     <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${style}`}>
       {level}
@@ -62,7 +62,7 @@ export default function LogsPage() {
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
   const [filterAction, setFilterAction] = useState("All");
-  const [filterSeverity, setFilterSeverity] = useState("");
+  const [filterSeverity, setFilterSeverity] = useState<number | "">("");
   const [filterPage, setFilterPage] = useState("");
   const [filterNotes, setFilterNotes] = useState("");
   const [filterTime, setFilterTime] = useState<DateRange>({ from: "", to: "" });
@@ -80,7 +80,7 @@ export default function LogsPage() {
       search.trim() !== "" ||
       filterCategory !== "All" ||
       filterAction !== "All" ||
-      filterSeverity.trim() !== "" ||
+      filterSeverity !== "" ||
       filterPage.trim() !== "" ||
       filterNotes.trim() !== "" ||
       filterTime.from !== "" ||
@@ -100,14 +100,13 @@ export default function LogsPage() {
 
   const displayed = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const severity = filterSeverity.trim().toLowerCase();
     const page = filterPage.trim().toLowerCase();
     const notes = filterNotes.trim().toLowerCase();
     return logs.filter((log) => {
       if (q && !matches(log, q, userEmailMap)) return false;
       if (filterCategory !== "All" && log.category !== filterCategory) return false;
       if (filterAction !== "All" && log.action !== filterAction) return false;
-      if (severity && !(log.severityLevel ?? "").toLowerCase().includes(severity)) return false;
+      if (filterSeverity !== "" && log.severityLevel !== filterSeverity) return false;
       if (page && !(log.page ?? "").toLowerCase().includes(page)) return false;
       if (notes && !(log.notes ?? "").toLowerCase().includes(notes)) return false;
       if (!dateInRange(log.time, filterTime.from, filterTime.to)) return false;
@@ -123,7 +122,7 @@ export default function LogsPage() {
         escapeCSV(tsToISO(log.time) || formatDateTime(log.time)),
         escapeCSV(log.page ?? ""),
         escapeCSV(log.category ?? ""),
-        escapeCSV(log.severityLevel ?? ""),
+        escapeCSV(String(log.severityLevel ?? "")),
         escapeCSV(log.action ?? ""),
         escapeCSV(log.notes ?? ""),
         escapeCSV(log.customerId ?? ""),

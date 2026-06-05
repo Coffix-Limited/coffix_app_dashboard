@@ -13,7 +13,7 @@ export interface Log {
    * 3 or 5 - mid level: errors, payment decline, etc.
    * 9 - high level: financial transactions, kept long term
    */
-  severityLevel?: string;
+  severityLevel?: number;
 
   /**
    * Used for admin controlling staff, not customers in web app

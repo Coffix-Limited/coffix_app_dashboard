@@ -11,7 +11,7 @@ interface LogsFilterBarProps {
   categories: string[];
   filterAction: string; setFilterAction: (v: string) => void;
   actions: string[];
-  filterSeverity: string; setFilterSeverity: (v: string) => void;
+  filterSeverity: number | ""; setFilterSeverity: (v: number | "") => void;
   filterPage: string; setFilterPage: (v: string) => void;
   filterNotes: string; setFilterNotes: (v: string) => void;
   filterTime: DateRange; setFilterTime: (v: DateRange | ((p: DateRange) => DateRange)) => void;
@@ -86,18 +86,21 @@ export function LogsFilterBar({
         </div>
 
         {/* Severity */}
-        <div className={`flex flex-col gap-1 rounded-lg border bg-white px-3 py-1.5 min-w-[140px] ${filterSeverity ? "border-primary" : "border-border"}`}>
+        <div className={`flex flex-col gap-1 rounded-lg border bg-white px-3 py-1.5 min-w-[150px] ${filterSeverity !== "" ? "border-primary" : "border-border"}`}>
           <span className="flex items-center justify-between text-[10px] font-medium uppercase tracking-wide text-light-grey">
             Severity
-            {filterSeverity && <button onClick={() => setFilterSeverity("")} className="ml-1 text-light-grey hover:text-black">×</button>}
+            {filterSeverity !== "" && <button onClick={() => setFilterSeverity("")} className="ml-1 text-light-grey hover:text-black">×</button>}
           </span>
-          <input
-            type="text"
-            placeholder="contains…"
-            value={filterSeverity}
-            onChange={(e) => setFilterSeverity(e.target.value)}
-            className="h-7 w-full bg-transparent text-sm text-black outline-none placeholder:text-light-grey"
-          />
+          <Select value={filterSeverity === "" ? "All" : String(filterSeverity)} onValueChange={(v) => setFilterSeverity(v === "All" ? "" : Number(v))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">All</SelectItem>
+              <SelectItem value="1">1 — Low</SelectItem>
+              <SelectItem value="3">3 — Mid</SelectItem>
+              <SelectItem value="5">5 — Mid-High</SelectItem>
+              <SelectItem value="9">9 — High</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Page */}
