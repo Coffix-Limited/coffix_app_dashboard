@@ -108,6 +108,7 @@ export default function UsersPage() {
   const [filterQrId, setFilterQrId] = useState("");
   const [filterMobile, setFilterMobile] = useState("");
   const [filterBirthday, setFilterBirthday] = useState<DateRange>({ from: "", to: "" });
+  const [filterBirthMonth, setFilterBirthMonth] = useState("All");
   const [filterCreatedAt, setFilterCreatedAt] = useState<DateRange>({ from: "", to: "" });
   const [filterLastLogin, setFilterLastLogin] = useState<DateRange>({ from: "", to: "" });
   const [filterCreditExpiry, setFilterCreditExpiry] = useState<DateRange>({ from: "", to: "" });
@@ -148,6 +149,7 @@ export default function UsersPage() {
     setFilterQrId("");
     setFilterMobile("");
     setFilterBirthday({ from: "", to: "" });
+    setFilterBirthMonth("All");
     setFilterCreatedAt({ from: "", to: "" });
     setFilterLastLogin({ from: "", to: "" });
     setFilterCreditExpiry({ from: "", to: "" });
@@ -177,6 +179,7 @@ export default function UsersPage() {
       filterQrId.trim() !== "" ||
       filterMobile.trim() !== "" ||
       filterBirthday.from !== "" || filterBirthday.to !== "" ||
+      filterBirthMonth !== "All" ||
       filterCreatedAt.from !== "" || filterCreatedAt.to !== "" ||
       filterLastLogin.from !== "" || filterLastLogin.to !== "" ||
       filterCreditExpiry.from !== "" || filterCreditExpiry.to !== "" ||
@@ -189,7 +192,7 @@ export default function UsersPage() {
     );
   }, [
     search, storeFilter, filterEmail, filterDocId, filterSuburb, filterCity,
-    filterAppVersion, filterQrId, filterMobile, filterBirthday, filterCreatedAt,
+    filterAppVersion, filterQrId, filterMobile, filterBirthday, filterBirthMonth, filterCreatedAt,
     filterLastLogin, filterCreditExpiry, filterEmailVerified, filterGetPurchaseInfoByMail,
     filterGetPromotions, filterAllowWinACoffee, filterDisabled, filterCreditAvailable,
   ]);
@@ -216,6 +219,13 @@ export default function UsersPage() {
       if (filterQrId.trim() && !(u.qrId ?? "").toLowerCase().includes(filterQrId.trim().toLowerCase())) return false;
       if (filterMobile.trim() && !(u.mobile ?? "").toLowerCase().includes(filterMobile.trim().toLowerCase())) return false;
       if (!dateInRange(u.birthday, filterBirthday.from, filterBirthday.to)) return false;
+      if (filterBirthMonth !== "All") {
+        if (!u.birthday) return false;
+        const bd = typeof (u.birthday as unknown as { toDate?: () => Date }).toDate === "function"
+          ? (u.birthday as unknown as { toDate: () => Date }).toDate()
+          : (u.birthday as Date);
+        if (bd.getMonth() + 1 !== Number(filterBirthMonth)) return false;
+      }
       if (!dateInRange(u.createdAt, filterCreatedAt.from, filterCreatedAt.to)) return false;
       if (!dateInRange(u.lastLogin, filterLastLogin.from, filterLastLogin.to)) return false;
       if (!dateInRange(u.creditExpiry, filterCreditExpiry.from, filterCreditExpiry.to)) return false;
@@ -242,7 +252,7 @@ export default function UsersPage() {
   }, [
     users, search, statusFilter, storeFilter, sortDir,
     filterEmail, filterDocId, filterSuburb, filterCity, filterAppVersion,
-    filterQrId, filterMobile, filterBirthday, filterCreatedAt, filterLastLogin,
+    filterQrId, filterMobile, filterBirthday, filterBirthMonth, filterCreatedAt, filterLastLogin,
     filterCreditExpiry, filterEmailVerified, filterGetPurchaseInfoByMail,
     filterGetPromotions, filterAllowWinACoffee, filterDisabled, filterCreditAvailable,
   ]);
@@ -470,6 +480,7 @@ export default function UsersPage() {
         storeFilter={storeFilter} setStoreFilter={setStoreFilterAndClear}
         stores={stores}
         filterBirthday={filterBirthday} setFilterBirthday={setFilterBirthday}
+        filterBirthMonth={filterBirthMonth} setFilterBirthMonth={setFilterBirthMonth}
         filterCreatedAt={filterCreatedAt} setFilterCreatedAt={setFilterCreatedAt}
         filterLastLogin={filterLastLogin} setFilterLastLogin={setFilterLastLogin}
         filterCreditExpiry={filterCreditExpiry} setFilterCreditExpiry={setFilterCreditExpiry}
