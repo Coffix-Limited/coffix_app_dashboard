@@ -19,6 +19,7 @@ interface UsersFilterBarProps {
   storeFilter: string; setStoreFilter: (v: string) => void;
   stores: { docId: string; name?: string }[];
   filterBirthday: DateRange; setFilterBirthday: (v: DateRange | ((p: DateRange) => DateRange)) => void;
+  filterBirthMonth: string; setFilterBirthMonth: (v: string) => void;
   filterCreatedAt: DateRange; setFilterCreatedAt: (v: DateRange | ((p: DateRange) => DateRange)) => void;
   filterLastLogin: DateRange; setFilterLastLogin: (v: DateRange | ((p: DateRange) => DateRange)) => void;
   filterCreditExpiry: DateRange; setFilterCreditExpiry: (v: DateRange | ((p: DateRange) => DateRange)) => void;
@@ -44,6 +45,7 @@ export function UsersFilterBar({
   storeFilter, setStoreFilter,
   stores,
   filterBirthday, setFilterBirthday,
+  filterBirthMonth, setFilterBirthMonth,
   filterCreatedAt, setFilterCreatedAt,
   filterLastLogin, setFilterLastLogin,
   filterCreditExpiry, setFilterCreditExpiry,
@@ -182,6 +184,32 @@ export function UsersFilterBar({
             <span className="shrink-0 text-xs text-light-grey">–</span>
             <DateInput value={filterBirthday.to} onChange={(v) => setFilterBirthday((p) => ({ ...p, to: v }))} />
           </div>
+        </div>
+
+        {/* Birth Month */}
+        <div className={`flex flex-col gap-1 rounded-lg border bg-white px-3 py-1.5 min-w-[150px] ${filterBirthMonth !== "All" ? "border-primary" : "border-border"}`}>
+          <span className="flex items-center justify-between text-[10px] font-medium uppercase tracking-wide text-light-grey">
+            Birth Month
+            {filterBirthMonth !== "All" && <button onClick={() => setFilterBirthMonth("All")} className="ml-1 text-light-grey hover:text-black">×</button>}
+          </span>
+          <Select value={filterBirthMonth} onValueChange={(v) => setFilterBirthMonth(v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">All</SelectItem>
+              <SelectItem value="1">January</SelectItem>
+              <SelectItem value="2">February</SelectItem>
+              <SelectItem value="3">March</SelectItem>
+              <SelectItem value="4">April</SelectItem>
+              <SelectItem value="5">May</SelectItem>
+              <SelectItem value="6">June</SelectItem>
+              <SelectItem value="7">July</SelectItem>
+              <SelectItem value="8">August</SelectItem>
+              <SelectItem value="9">September</SelectItem>
+              <SelectItem value="10">October</SelectItem>
+              <SelectItem value="11">November</SelectItem>
+              <SelectItem value="12">December</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Created At */}

@@ -150,6 +150,7 @@ export default function UsersPage() {
   const [filterAllowWinACoffee, setFilterAllowWinACoffee] = useState<BoolFilter>("Any");
   const [filterDisabled, setFilterDisabled] = useState<BoolFilter>("Any");
   const [filterCreditAvailable, setFilterCreditAvailable] = useState<NumberRange>({ min: "", max: "" });
+  const [filterBirthMonth, setFilterBirthMonth] = useState<string>("All");
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showAddCredits, setShowAddCredits] = useState(false);
@@ -191,6 +192,7 @@ export default function UsersPage() {
     setFilterAllowWinACoffee("Any");
     setFilterDisabled("Any");
     setFilterCreditAvailable({ min: "", max: "" });
+    setFilterBirthMonth("All");
     clearSelection();
   }
 
@@ -219,13 +221,15 @@ export default function UsersPage() {
       filterGetPromotions !== "Any" ||
       filterAllowWinACoffee !== "Any" ||
       filterDisabled !== "Any" ||
-      filterCreditAvailable.min !== "" || filterCreditAvailable.max !== ""
+      filterCreditAvailable.min !== "" || filterCreditAvailable.max !== "" ||
+      filterBirthMonth !== "All"
     );
   }, [
     search, storeFilter, filterEmail, filterDocId, filterSuburb, filterCity,
     filterAppVersion, filterQrId, filterMobile, filterBirthday, filterCreatedAt,
     filterLastLogin, filterCreditExpiry, filterEmailVerified, filterGetPurchaseInfoByMail,
     filterGetPromotions, filterAllowWinACoffee, filterDisabled, filterCreditAvailable,
+    filterBirthMonth,
   ]);
 
   const filtered = useMemo(() => {
@@ -250,6 +254,13 @@ export default function UsersPage() {
       if (filterQrId.trim() && !(u.qrId ?? "").toLowerCase().includes(filterQrId.trim().toLowerCase())) return false;
       if (filterMobile.trim() && !(u.mobile ?? "").toLowerCase().includes(filterMobile.trim().toLowerCase())) return false;
       if (!dateInRange(u.birthday, filterBirthday.from, filterBirthday.to)) return false;
+      if (filterBirthMonth !== "All") {
+        if (!u.birthday) return false;
+        const bd = typeof (u.birthday as unknown as { toDate?: () => Date }).toDate === "function"
+          ? (u.birthday as unknown as { toDate: () => Date }).toDate()
+          : (u.birthday as Date);
+        if (bd.getMonth() + 1 !== Number(filterBirthMonth)) return false;
+      }
       if (!dateInRange(u.createdAt, filterCreatedAt.from, filterCreatedAt.to)) return false;
       if (!dateInRange(u.lastLogin, filterLastLogin.from, filterLastLogin.to)) return false;
       if (!dateInRange(u.creditExpiry, filterCreditExpiry.from, filterCreditExpiry.to)) return false;
@@ -282,6 +293,7 @@ export default function UsersPage() {
     filterQrId, filterMobile, filterBirthday, filterCreatedAt, filterLastLogin,
     filterCreditExpiry, filterEmailVerified, filterGetPurchaseInfoByMail,
     filterGetPromotions, filterAllowWinACoffee, filterDisabled, filterCreditAvailable,
+    filterBirthMonth,
   ]);
 
   const bulkInitialFlags = useMemo(() => {
@@ -528,6 +540,7 @@ export default function UsersPage() {
         storeFilter={storeFilter} setStoreFilter={setStoreFilterAndClear}
         stores={stores}
         filterBirthday={filterBirthday} setFilterBirthday={setFilterBirthday}
+        filterBirthMonth={filterBirthMonth} setFilterBirthMonth={setFilterBirthMonth}
         filterCreatedAt={filterCreatedAt} setFilterCreatedAt={setFilterCreatedAt}
         filterLastLogin={filterLastLogin} setFilterLastLogin={setFilterLastLogin}
         filterCreditExpiry={filterCreditExpiry} setFilterCreditExpiry={setFilterCreditExpiry}
