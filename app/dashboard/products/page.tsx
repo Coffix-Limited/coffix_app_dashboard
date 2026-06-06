@@ -298,7 +298,10 @@ export default function ProductsPage() {
       if (sortKey === "name") cmp = (a.order ?? 0) - (b.order ?? 0) || (a.name ?? "").localeCompare(b.name ?? "");
       else if (sortKey === "price") cmp = (a.price ?? 0) - (b.price ?? 0);
       else if (sortKey === "cost") cmp = (a.cost ?? 0) - (b.cost ?? 0);
-      else if (sortKey === "category") cmp = (getCategoryName(a.categoryId) ?? "").localeCompare(getCategoryName(b.categoryId) ?? "");
+      else if (sortKey === "category")
+        cmp =
+          (getCategoryName(a.categoryId) ?? "").localeCompare(getCategoryName(b.categoryId) ?? "") ||
+          (a.order ?? 0) - (b.order ?? 0);
       return sortDir === "asc" ? cmp : -cmp;
     });
     return result;
