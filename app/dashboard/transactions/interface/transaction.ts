@@ -30,6 +30,7 @@ export interface Transaction {
   senderLastName?: string | null;
   transactionNumber?: string | null;
   totalAmount?: number | null;
+  sessionId?: string | null;
 
   // GST fields
   gst?: number | null;

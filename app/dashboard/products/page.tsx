@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useDashboardStore } from "./store/useDashboardStore";
+import { useProductSortStore } from "./store/useProductSortStore";
 import { useStoreStore } from "../stores/store/useStoreStore";
 import { Product } from "./interface/product";
 import { ProductService } from "./service/ProductService";
@@ -126,23 +127,18 @@ export default function ProductsPage() {
 
   const router = useRouter();
   type NumberRange = { min: string; max: string };
-  type ProductSortKey = "name" | "price" | "cost" | "category";
-  type SortDir = "asc" | "desc";
+
+  const sortKey = useProductSortStore((s) => s.sortKey);
+  const sortDir = useProductSortStore((s) => s.sortDir);
+  const toggleSort = useProductSortStore((s) => s.toggleSort);
 
   const [search, setSearch] = useState("");
-  const [sortKey, setSortKey] = useState<ProductSortKey>("name");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const [filterCategoryId, setFilterCategoryId] = useState("All");
   const [filterPrice, setFilterPrice] = useState<NumberRange>({ min: "", max: "" });
   const [filterCost, setFilterCost] = useState<NumberRange>({ min: "", max: "" });
   const [filterAvailableInStore, setFilterAvailableInStore] = useState("All");
   const [filterDisabledInStore, setFilterDisabledInStore] = useState("All");
-
-  function toggleSort(key: ProductSortKey) {
-    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortKey(key); setSortDir("asc"); }
-  }
 
   function clearAllFilters() {
     setSearch("");

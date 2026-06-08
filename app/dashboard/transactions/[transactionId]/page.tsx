@@ -10,6 +10,9 @@ import { PaymentMethod } from "../interface/transaction";
 import { Item } from "../interface/order";
 import { formatDateTime } from "@/app/utils/formatting";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { InfoCard, InfoRow } from "../components/InfoCard";
+import { WindcaveSessionView } from "../components/WindcaveSessionView";
 import {
   Dialog,
   DialogContent,
@@ -19,35 +22,6 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-
-function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="flex items-center justify-between px-4 py-3">
-      <span className="text-xs text-light-grey">{label}</span>
-      <span
-        className={`max-w-xs truncate text-right text-sm text-black ${mono ? "font-mono" : ""}`}
-        title={value}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function InfoCard({ title, rows }: { title: string; rows: { label: string; value: string; mono?: boolean }[] }) {
-  return (
-    <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
-      <div className="border-b border-border px-4 py-3">
-        <h2 className="font-semibold text-black">{title}</h2>
-      </div>
-      <div className="divide-y divide-border">
-        {rows.map(({ label, value, mono }) => (
-          <InfoRow key={label} label={label} value={value} mono={mono} />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function PaymentMethodBadge({ method }: { method: PaymentMethod | null | undefined }) {
   if (!method) return <span className="text-sm text-black">—</span>;
@@ -153,6 +127,8 @@ export default function TransactionDetailPage() {
 
   const hasRecipient = !!(tx.recipientCustomerId || tx.recipientEmail);
 
+  const windcaveSessionId = tx.sessionId ?? tx.paymentId ?? null;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -230,6 +206,15 @@ export default function TransactionDetailPage() {
         </div>
       </div>
 
+      <Tabs defaultValue="transaction">
+        <TabsList>
+          <TabsTrigger value="transaction">Transaction</TabsTrigger>
+          <TabsTrigger value="windcave" disabled={!windcaveSessionId}>
+            Windcave Session
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="transaction">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Transaction Details */}
         <InfoCard
@@ -326,6 +311,14 @@ export default function TransactionDetailPage() {
           </div>
         )}
       </div>
+        </TabsContent>
+
+        <TabsContent value="windcave">
+          {windcaveSessionId && (
+            <WindcaveSessionView key={windcaveSessionId} sessionId={windcaveSessionId} />
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
