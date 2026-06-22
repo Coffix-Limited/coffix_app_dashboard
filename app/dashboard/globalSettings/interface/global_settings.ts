@@ -29,4 +29,5 @@ export interface GlobalSettings {
   defGetPromotions?: boolean;
   defAllowWinACoffee?: boolean;
   defAllowCoffeeForHome?: boolean;
+  defAllowNotifications?: boolean;
 }

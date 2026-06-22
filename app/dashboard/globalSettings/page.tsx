@@ -323,6 +323,7 @@ type FlagsState = {
   defGetPromotions: boolean;
   defAllowWinACoffee: boolean;
   defAllowCoffeeForHome: boolean;
+  defAllowNotifications: boolean;
 };
 
 const emptyFlags: FlagsState = {
@@ -334,6 +335,7 @@ const emptyFlags: FlagsState = {
   defGetPromotions: false,
   defAllowWinACoffee: false,
   defAllowCoffeeForHome: false,
+  defAllowNotifications: false,
 };
 
 const FLAG_META: { key: keyof FlagsState; label: string; description: string }[] = [
@@ -345,6 +347,7 @@ const FLAG_META: { key: keyof FlagsState; label: string; description: string }[]
   { key: "defGetPromotions", label: "Get Promotions", description: "Subscribe to promotions by default" },
   { key: "defAllowWinACoffee", label: "Allow Win a Coffee", description: "Enable \"Win a Coffee\" feature by default" },
   { key: "defAllowCoffeeForHome", label: "Allow Coffee for Home", description: "Enable \"Coffee for Home\" feature by default" },
+  { key: "defAllowNotifications", label: "Allow Notifications", description: "Enable push notifications for new users by default" },
 ];
 
 export default function GlobalSettingsPage() {
@@ -367,6 +370,7 @@ export default function GlobalSettingsPage() {
         defGetPromotions: settings.defGetPromotions ?? false,
         defAllowWinACoffee: settings.defAllowWinACoffee ?? false,
         defAllowCoffeeForHome: settings.defAllowCoffeeForHome ?? false,
+        defAllowNotifications: settings.defAllowNotifications ?? false,
       });
     }
   }, [settings]);

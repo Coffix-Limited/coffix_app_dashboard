@@ -246,20 +246,22 @@ export default function ProductDetailPage() {
                     <h1 className="text-2xl font-semibold text-black">{product.name ?? "—"}</h1>
                     <p className="mt-1 text-sm text-black">{getCategoryName(product.categoryId)}</p>
                 </div>
-                <div className="flex gap-2">
-                    <Button
-                        variant="outline"
-                        onClick={openEditProduct}
-                    >
-                        Edit
-                    </Button>
-                    <Button
-                        variant="destructive"
-                        onClick={() => setDialog("delete-product")}
-                    >
-                        Delete
-                    </Button>
-                </div>
+                {isAdmin && (
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={openEditProduct}
+                        >
+                            Edit
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => setDialog("delete-product")}
+                        >
+                            Delete
+                        </Button>
+                    </div>
+                )}
             </div>
 
             {/* Product image — square to match 1200×1200 mobile app asset */}
@@ -362,9 +364,11 @@ export default function ProductDetailPage() {
                 <div className="lg:col-span-2 space-y-4">
                     <div className="flex items-center justify-between">
                         <h2 className="font-semibold text-black">Modifier Groups</h2>
-                        <Button onClick={openAddModifier} size="sm">
-                            + Add Modifier Group
-                        </Button>
+                        {isAdmin && (
+                            <Button onClick={openAddModifier} size="sm">
+                                + Add Modifier Group
+                            </Button>
+                        )}
                     </div>
 
                     {productModifierGroups.length === 0 ? (
@@ -376,10 +380,10 @@ export default function ProductDetailPage() {
                             {productModifierGroups.map((group, i) => (
                                 <div
                                     key={group.docId}
-                                    draggable
-                                    onDragStart={() => { dragIndex.current = i; }}
+                                    draggable={isAdmin}
+                                    onDragStart={() => { if (isAdmin) dragIndex.current = i; }}
                                     onDragOver={(e) => e.preventDefault()}
-                                    onDrop={() => handleDrop(i)}
+                                    onDrop={() => { if (isAdmin) handleDrop(i); }}
                                     className={`flex items-center justify-between px-4 py-3 ${i !== 0 ? "border-t border-border" : ""}`}
                                 >
                                     <div className="flex items-center gap-3">
@@ -395,13 +399,15 @@ export default function ProductDetailPage() {
                                             <span className="font-medium text-black">{group.name ?? "—"}</span>
                                         </div>
                                     </div>
-                                    <Button
-                                        variant="destructive"
-                                        size="xs"
-                                        onClick={() => openRemoveModifierGroup(group.docId ?? "")}
-                                    >
-                                        Remove
-                                    </Button>
+                                    {isAdmin && (
+                                        <Button
+                                            variant="destructive"
+                                            size="xs"
+                                            onClick={() => openRemoveModifierGroup(group.docId ?? "")}
+                                        >
+                                            Remove
+                                        </Button>
+                                    )}
                                 </div>
                             ))}
                         </div>

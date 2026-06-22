@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useUserStore } from "./store/useUserStore";
 import { useStoreStore } from "@/app/dashboard/stores/store/useStoreStore";
+import { useTransactionStore } from "@/app/dashboard/transactions/store/useTransactionStore";
+import { accumulateCoffixCredit, reconcileCoffixCredit } from "@/app/utils/coffixCredit";
 import { UserService } from "./service/UserService";
 import { AppUser } from "./interface/user";
 import {
@@ -121,7 +123,24 @@ const FLAG_KEYS: FlagKey[] = [
 export default function UsersPage() {
   const users = useUserStore((s) => s.users);
   const stores = useStoreStore((s) => s.stores);
+  const transactions = useTransactionStore((s) => s.transactions);
   const router = useRouter();
+
+  // Re-derive each user's coffix credit from their coffixCredit transactions once,
+  // so rows don't each re-scan the full transaction list.
+  const accumulatedByUser = useMemo(() => {
+    const userIds = new Set<string>();
+    for (const tx of transactions) {
+      if (tx.paymentMethod !== "coffixCredit") continue;
+      if (tx.customerId) userIds.add(tx.customerId);
+      if (tx.recipientCustomerId) userIds.add(tx.recipientCustomerId);
+    }
+    const map = new Map<string, number>();
+    for (const id of userIds) {
+      map.set(id, accumulateCoffixCredit(transactions, id));
+    }
+    return map;
+  }, [transactions]);
 
   type BoolFilter = "Any" | "Yes" | "No";
   type DateRange = { from: string; to: string };
@@ -497,9 +516,9 @@ export default function UsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-black">Users</h1>
+          <h1 className="text-2xl font-semibold text-black">Customers</h1>
           <p className="mt-1 text-sm text-light-grey">
-            {users.length} user{users.length !== 1 ? "s" : ""} total
+            {users.length} customer{users.length !== 1 ? "s" : ""} total
           </p>
         </div>
         <div className="flex gap-2">
@@ -604,13 +623,15 @@ export default function UsersPage() {
               </th>
               <th className="px-5 py-3 text-left font-medium text-light-grey">Email</th>
               <th className="px-5 py-3 text-left font-medium text-light-grey">Preferred Store</th>
+              <th className="w-36 px-5 py-3 text-right font-medium text-light-grey">Coffix Credit</th>
+              <th className="w-36 px-5 py-3 text-right font-medium text-light-grey">Accumulated</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-5 py-10 text-center text-light-grey">
-                  No users found.
+                <td colSpan={6} className="px-5 py-10 text-center text-light-grey">
+                  No customers found.
                 </td>
               </tr>
             ) : (
@@ -618,6 +639,9 @@ export default function UsersPage() {
                 const displayName = getDisplayName(user);
                 const initials = getInitials(displayName);
                 const isSelected = selectedIds.has(user.docId!);
+                const currentCredit = user.creditAvailable ?? 0;
+                const accumulatedCredit = accumulatedByUser.get(user.docId!) ?? 0;
+                const reconciliation = reconcileCoffixCredit(currentCredit, accumulatedCredit);
                 return (
                   <tr
                     key={user.docId}
@@ -649,6 +673,20 @@ export default function UsersPage() {
                     </td>
                     <td className="truncate px-5 py-3 text-black">{user.email ?? "—"}</td>
                     <td className="truncate px-5 py-3 text-black">{getStoreName(user.preferredStoreId, stores)}</td>
+                    <td className="px-5 py-3 text-right text-black tabular-nums">
+                      ${currentCredit.toFixed(2)}
+                    </td>
+                    <td
+                      className={`px-5 py-3 text-right tabular-nums ${reconciliation.matches ? "text-black" : "font-medium text-red-600"}`}
+                      title={
+                        reconciliation.matches
+                          ? undefined
+                          : `Mismatch — stored $${currentCredit.toFixed(2)} vs accumulated $${accumulatedCredit.toFixed(2)} (diff $${reconciliation.difference.toFixed(2)})`
+                      }
+                    >
+                      ${accumulatedCredit.toFixed(2)}
+                      {!reconciliation.matches && <span className="ml-1">⚠</span>}
+                    </td>
                   </tr>
                 );
               })
@@ -694,7 +732,7 @@ export default function UsersPage() {
       <Dialog open={showImportInfo} onOpenChange={setShowImportInfo}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>CSV Import Guide — Users</DialogTitle>
+            <DialogTitle>CSV Import Guide — Customers</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2 text-sm">
             <div className="space-y-1.5">

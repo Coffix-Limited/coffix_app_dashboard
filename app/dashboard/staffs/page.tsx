@@ -534,11 +534,11 @@ export default function StaffsPage() {
         storeIds: editForm.storeIds,
         disabled: editForm.disabled,
       });
-      toast.success("Staff member updated.");
+      toast.success("User updated.");
       closeEdit();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to update staff. Please try again.");
+      toast.error("Failed to update user. Please try again.");
     } finally {
       setEditLoading(false);
     }
@@ -549,10 +549,10 @@ export default function StaffsPage() {
     if (!window.confirm(`Delete ${staff.email}? This cannot be undone.`)) return;
     try {
       await StaffService.deleteStaff(staff.docId);
-      toast.success("Staff member deleted.");
+      toast.success("User deleted.");
     } catch (err) {
       console.error(err);
-      toast.error("Failed to delete staff.");
+      toast.error("Failed to delete user.");
     }
   }
 
@@ -569,9 +569,9 @@ export default function StaffsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-black">Staff</h1>
+          <h1 className="text-2xl font-semibold text-black">Users</h1>
           <p className="mt-1 text-sm text-light-grey">
-            {staffs.length} staff member{staffs.length !== 1 ? "s" : ""} total
+            {staffs.length} user{staffs.length !== 1 ? "s" : ""} total
           </p>
         </div>
         <div className="flex gap-2">
@@ -593,7 +593,7 @@ export default function StaffsPage() {
           <div className="flex gap-2">
           <Button variant="outline"  onClick={exportToCSV}>Export CSV</Button>
           <Button onClick={openCreate}>
-              + New Staff
+              + New User
             </Button>
         </div>
         </div>
@@ -639,7 +639,7 @@ export default function StaffsPage() {
             {displayed.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-5 py-10 text-center text-light-grey">
-                  No staff members found.
+                  No users found.
                 </td>
               </tr>
             ) : (
@@ -701,7 +701,7 @@ export default function StaffsPage() {
       {/* Create Dialog */}
       {showCreate && (
         <StaffDialog
-          title="New Staff"
+          title="New User"
           form={createForm}
           errors={createErrors}
           loading={createLoading}
@@ -737,7 +737,7 @@ export default function StaffsPage() {
       {/* Edit Dialog */}
       {editTarget && (
         <StaffDialog
-          title="Edit Staff"
+          title="Edit User"
           form={editForm}
           errors={editErrors}
           loading={editLoading}
@@ -776,7 +776,7 @@ export default function StaffsPage() {
       <Dialog open={showImportInfo} onOpenChange={setShowImportInfo}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>CSV Import Guide — Staff</DialogTitle>
+            <DialogTitle>CSV Import Guide — Users</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2 text-sm">
             <div className="space-y-1.5">

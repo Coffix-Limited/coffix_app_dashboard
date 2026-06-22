@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Image from "next/image";
 import { useStoreStore } from "./store/useStoreStore";
+import { useAuth } from "@/app/lib/AuthContext";
 import { isStoreOpenAt, DayHours } from "./interface/store";
 import { StoreService } from "./service/StoreService";
 import {
@@ -66,8 +67,18 @@ const REQUIRED: (keyof Omit<StoreForm, "openingHours">)[] = [
 ];
 
 export default function StoresPage() {
-  const stores = useStoreStore((s) => s.stores);
+  const allStores = useStoreStore((s) => s.stores);
   const router = useRouter();
+
+  const { currentStaff } = useAuth();
+  const isAdmin = currentStaff?.role === "admin";
+
+  // Store managers only see the stores they're assigned to.
+  const stores = useMemo(() => {
+    if (isAdmin) return allStores;
+    const myStoreIds = currentStaff?.storeIds ?? [];
+    return allStores.filter((s) => myStoreIds.includes(s.docId));
+  }, [allStores, isAdmin, currentStaff?.storeIds]);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"All" | "Open" | "Closed" | "Disabled">("All");
@@ -386,19 +397,23 @@ export default function StoresPage() {
           >
             {importLoading ? "Importing…" : "Import CSV"}
           </Button> */}
-          <Button
-            variant="outline"
-            onClick={exportToCSV}
-            disabled={displayed.length === 0}
-          >
-            Export CSV
-          </Button>
-          <Button
-            onClick={() => setShowCreate(true)}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
-          >
-            + New Store
-          </Button>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              onClick={exportToCSV}
+              disabled={displayed.length === 0}
+            >
+              Export CSV
+            </Button>
+          )}
+          {isAdmin && (
+            <Button
+              onClick={() => setShowCreate(true)}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
+            >
+              + New Store
+            </Button>
+          )}
         </div>
       </div>
 
@@ -487,23 +502,31 @@ export default function StoresPage() {
                       />
                     </td>
                     <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        size="xs"
-                        variant={isDisabled ? "solid-error" : "solid-success"}
-                        onClick={() => StoreService.updateStore(store.docId, { disable: !isDisabled })}
-                        className="rounded-full"
-                      >
-                        {isDisabled ? "Disabled" : "Enabled"}
-                      </Button>
+                      {isAdmin ? (
+                        <Button
+                          size="xs"
+                          variant={isDisabled ? "solid-error" : "solid-success"}
+                          onClick={() => StoreService.updateStore(store.docId, { disable: !isDisabled })}
+                          className="rounded-full"
+                        >
+                          {isDisabled ? "Disabled" : "Enabled"}
+                        </Button>
+                      ) : (
+                        <span className="text-sm text-light-grey">{isDisabled ? "Disabled" : "Enabled"}</span>
+                      )}
                     </td>
                     <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        size="xs"
-                        variant="destructive"
-                        onClick={() => setDeleteStoreId(store.docId)}
-                      >
-                        Delete
-                      </Button>
+                      {isAdmin ? (
+                        <Button
+                          size="xs"
+                          variant="destructive"
+                          onClick={() => setDeleteStoreId(store.docId)}
+                        >
+                          Delete
+                        </Button>
+                      ) : (
+                        <span className="text-sm text-light-grey">—</span>
+                      )}
                     </td>
                   </tr>
                 );

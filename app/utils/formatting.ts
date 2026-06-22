@@ -12,6 +12,35 @@ export const stripCurrencySymbol = (value: string): string => {
   return value.replace(/^\$/, "");
 };
 
+export const toDateSafe = (value: unknown): Date | undefined => {
+  if (value === undefined || value === null) return undefined;
+  // Firestore Timestamp instance
+  if (typeof (value as { toDate?: () => Date }).toDate === "function") {
+    const d = (value as { toDate: () => Date }).toDate();
+    return isNaN(d.getTime()) ? undefined : d;
+  }
+  // Real Date
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? undefined : value;
+  }
+  // Serialized Timestamp: { seconds, nanoseconds } or { _seconds, _nanoseconds }
+  if (typeof value === "object") {
+    const o = value as { seconds?: number; _seconds?: number };
+    const seconds = o.seconds ?? o._seconds;
+    if (typeof seconds === "number") {
+      const d = new Date(seconds * 1000);
+      return isNaN(d.getTime()) ? undefined : d;
+    }
+    return undefined;
+  }
+  // ISO string / number
+  if (typeof value === "string" || typeof value === "number") {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? undefined : d;
+  }
+  return undefined;
+};
+
 export const formatDate = (value: unknown): string => {
   if (!value) return "—";
   let date: Date | null = null;

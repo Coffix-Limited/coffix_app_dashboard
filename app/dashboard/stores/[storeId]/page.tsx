@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Image from "next/image";
 import { useStoreStore } from "../store/useStoreStore";
+import { useAuth } from "@/app/lib/AuthContext";
 import { isStoreOpenAt, DayHours, HolidayHours, Store } from "../interface/store";
 import { StoreService } from "../service/StoreService";
 import { formatTime } from "@/app/utils/formatting";
@@ -32,7 +33,7 @@ const REQUIRED: (keyof Omit<StoreEditForm, "openingHours">)[] = [
   "name", "email", "contactNumber", "location", "address", "printerId",
 ];
 
-type DialogMode = "edit-store" | "add-holiday" | "edit-holiday" | "delete-holiday" | "delete-store" | null;
+type DialogMode = "edit-store" | "edit-hours" | "add-holiday" | "edit-holiday" | "delete-holiday" | "delete-store" | null;
 
 type HolidayForm = {
   date: string;
@@ -78,6 +79,11 @@ export default function StoreDetailPage() {
   const { storeId } = useParams<{ storeId: string }>();
   const router = useRouter();
 
+  const { currentStaff } = useAuth();
+  const isAdmin = currentStaff?.role === "admin";
+  const myStoreIds = currentStaff?.storeIds ?? [];
+  const canAccess = isAdmin || myStoreIds.includes(storeId);
+
   const stores = useStoreStore((s) => s.stores);
 
   const [dialog, setDialog] = useState<DialogMode>(null);
@@ -96,6 +102,36 @@ export default function StoreDetailPage() {
     setForm(storeToForm(store));
     setErrors({});
     setDialog("edit-store");
+  }
+
+  function openEditHours() {
+    if (!store) return;
+    setForm(storeToForm(store));
+    setErrors({});
+    setDialog("edit-hours");
+  }
+
+  async function handleSaveHours() {
+    if (!form || !store) return;
+
+    const openingHours: Record<string, DayHours> = Object.fromEntries(
+      DAYS.map((day) => {
+        const { isOpen, open, close } = form.openingHours[day];
+        return [day, { isOpen, open, close }];
+      }),
+    );
+
+    setLoading(true);
+    try {
+      await StoreService.updateStore(store.docId, { openingHours });
+      toast.success("Opening hours updated.");
+      closeDialog();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update opening hours. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   function closeDialog() {
@@ -257,7 +293,7 @@ export default function StoreDetailPage() {
     }
   }
 
-  if (!store) {
+  if (!store || !canAccess) {
     return (
       <div className="flex h-64 items-center justify-center text-light-grey">
         Store not found.
@@ -300,20 +336,22 @@ export default function StoreDetailPage() {
             )}
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="destructive"
-            onClick={() => setDialog("delete-store")}
-          >
-            Delete
-          </Button>
-          <Button
-            onClick={openEdit}
-            variant="outline"
-          >
-            Edit
-          </Button>
-        </div>
+        {isAdmin && (
+          <div className="flex gap-2">
+            <Button
+              variant="destructive"
+              onClick={() => setDialog("delete-store")}
+            >
+              Delete
+            </Button>
+            <Button
+              onClick={openEdit}
+              variant="outline"
+            >
+              Edit
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Store image — square to match 1200×1200 mobile app asset */}
@@ -356,8 +394,11 @@ export default function StoreDetailPage() {
 
         {/* Opening Hours Card */}
         <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
-          <div className="border-b border-border px-4 py-3">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h2 className="font-semibold text-black">Opening Hours</h2>
+            <Button onClick={openEditHours} variant="outline" size="sm">
+              Edit Hours
+            </Button>
           </div>
           <div className="divide-y divide-border">
             {DAYS.map((day) => {
@@ -609,6 +650,59 @@ export default function StoreDetailPage() {
                 disabled={loading}
               >
                 {loading ? "Saving…" : "Save Changes"}
+              </Button>
+            </div>
+          </>)}
+
+          {/* ── Edit Opening Hours (store managers + admins) ── */}
+          {dialog === "edit-hours" && form && (<>
+            <div className="border-b border-border px-6 py-4">
+              <h3 className="text-lg font-semibold text-black">Edit Opening Hours</h3>
+            </div>
+            <div className="max-h-[72vh] overflow-y-auto px-6 py-4">
+              <div className="overflow-hidden rounded-lg border border-border">
+                {DAYS.map((day, i) => {
+                  const hours = form.openingHours[day];
+                  return (
+                    <div
+                      key={day}
+                      className={`flex items-center gap-3 px-3 py-2.5 ${i !== DAYS.length - 1 ? "border-b border-border" : ""} ${!hours.isOpen ? "opacity-50" : ""}`}
+                    >
+                      <label className="flex w-28 shrink-0 cursor-pointer items-center gap-2 text-sm font-medium capitalize text-black">
+                        <input
+                          type="checkbox"
+                          checked={hours.isOpen}
+                          onChange={(e) => setDayHours(day, { isOpen: e.target.checked })}
+                          className="accent-primary"
+                        />
+                        {day}
+                      </label>
+                      <input
+                        type="time"
+                        disabled={!hours.isOpen}
+                        value={hours.open}
+                        onChange={(e) => setDayHours(day, { open: e.target.value })}
+                        className="rounded-md border border-border px-2 py-1 text-xs text-black outline-none focus:border-primary disabled:cursor-not-allowed"
+                      />
+                      <span className="text-xs text-light-grey">to</span>
+                      <input
+                        type="time"
+                        disabled={!hours.isOpen}
+                        value={hours.close}
+                        onChange={(e) => setDayHours(day, { close: e.target.value })}
+                        className="rounded-md border border-border px-2 py-1 text-xs text-black outline-none focus:border-primary disabled:cursor-not-allowed"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
+              <Button variant="outline" onClick={closeDialog}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveHours} disabled={loading}>
+                {loading ? "Saving…" : "Save Hours"}
               </Button>
             </div>
           </>)}

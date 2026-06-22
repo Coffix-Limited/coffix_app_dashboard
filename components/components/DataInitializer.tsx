@@ -25,6 +25,7 @@ export function DataInitializer() {
   const listenToCoupons = useCouponStore((s) => s.listenToCoupons);
   const listenToReferrals = useReferralStore((s) => s.listenToReferrals);
   const listenToLogs = useLogStore((s) => s.listenToLogs);
+  const listenToLogSettings = useLogStore((s) => s.listenToLogSettings);
 
   useEffect(() => {
     const unsubAll = listenToAll();
@@ -39,6 +40,7 @@ export function DataInitializer() {
     const unsubCoupons = listenToCoupons();
     const unsubReferrals = listenToReferrals();
     const unsubLogs = listenToLogs();
+    const unsubLogSettings = listenToLogSettings();
     return () => {
       unsubAll();
       unsubStores();
@@ -52,6 +54,7 @@ export function DataInitializer() {
       unsubCoupons();
       unsubReferrals();
       unsubLogs();
+      unsubLogSettings();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

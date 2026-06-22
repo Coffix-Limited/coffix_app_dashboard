@@ -140,6 +140,10 @@ export default function UserDetailPage() {
     user.nickName ||
     "—";
 
+  const preferredStore = stores.find((s) => s.docId === user.preferredStoreId);
+  const preferredStoreLabel =
+    preferredStore?.name ?? user.preferredStoreName ?? "—";
+
   // ── Handlers ──
 
   function openEdit() {
@@ -309,7 +313,7 @@ export default function UserDetailPage() {
         <InfoCard
           title="Preferences"
           rows={[
-            { label: "Preferred Store", value: user.preferredStoreName ?? user.preferredStoreId ?? "—" },
+            { label: "Preferred Store", value: preferredStoreLabel },
             { label: "Purchase Info by Mail", value: formatBool(user.getPurchaseInfoByMail) },
             { label: "Get Promotions", value: formatBool(user.getPromotions) },
             { label: "Allow Win a Coffee", value: formatBool(user.allowWinACoffee) },

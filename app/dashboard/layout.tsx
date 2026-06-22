@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { notFound, usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/app/lib/AuthContext";
+import { canAccess } from "@/app/lib/access";
 import { DataInitializer } from "@/components/components/DataInitializer";
 import { MobileNav, Sidebar } from "@/components/components/Sidebar";
 
@@ -11,7 +12,8 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, loading } = useAuth();
+  const { user, currentStaff, loading, staffLoading } = useAuth();
+  const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
@@ -20,12 +22,16 @@ export default function DashboardLayout({
     }
   }, [user, loading, router]);
 
-  if (loading || !user) {
+  if (loading || !user || staffLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
+  }
+
+  if (!canAccess(pathname, currentStaff?.role)) {
+    notFound();
   }
 
   return (

@@ -26,6 +26,7 @@ export default function ModifierGroupDetailPage() {
 
   const modifierGroups = useDashboardStore((s) => s.modifierGroups);
   const modifiers = useDashboardStore((s) => s.modifiers);
+  const products = useDashboardStore((s) => s.products);
 
   const [dialog, setDialog] = useState<DialogMode>(null);
   const [groupForm, setGroupForm] = useState({ name: "", required: false });
@@ -37,6 +38,9 @@ export default function ModifierGroupDetailPage() {
   const dragIndex = useRef<number | null>(null);
 
   const group = modifierGroups.find((g) => g.docId === modifierGroupId);
+  const productsUsingGroup = products.filter((p) =>
+    p.modifierGroupIds?.includes(modifierGroupId ?? ""),
+  );
 
   useEffect(() => {
     if (!group) return;
@@ -118,8 +122,12 @@ export default function ModifierGroupDetailPage() {
     if (!group?.docId) return;
     setLoading(true);
     try {
-      await ProductService.deleteModifierGroup(group.docId);
-      toast.success("Modifier group deleted.");
+      await ProductService.deleteModifierGroupCascade(
+        group.docId,
+        group.modifierIds ?? [],
+        productsUsingGroup.map((p) => p.docId).filter((id): id is string => !!id),
+      );
+      toast.success("Modifier group and its modifiers deleted.");
       router.push("/dashboard/modifierGroups");
     } catch (err) {
       console.error(err);
@@ -354,8 +362,21 @@ export default function ModifierGroupDetailPage() {
               <>
                 <h3 className="mb-2 text-lg font-semibold text-black">Delete Modifier Group</h3>
                 <p className="text-sm text-light-grey">
-                  Are you sure you want to delete <strong className="text-black">{group.name}</strong>? This cannot be undone.
+                  Are you sure you want to delete <strong className="text-black">{group.name}</strong>? Its modifiers will be deleted too. This cannot be undone.
                 </p>
+                {productsUsingGroup.length > 0 && (
+                  <div className="mt-3 rounded-lg border border-error/30 bg-error/5 px-3 py-2.5">
+                    <p className="text-xs font-medium text-error">
+                      ⚠ Used by {productsUsingGroup.length} product
+                      {productsUsingGroup.length !== 1 ? "s" : ""}
+                    </p>
+                    <p className="mt-1 text-xs text-light-grey">
+                      This group will be removed from{" "}
+                      {productsUsingGroup.slice(0, 5).map((p) => p.name ?? "Unnamed").join(", ")}
+                      {productsUsingGroup.length > 5 ? `, +${productsUsingGroup.length - 5} more` : ""}.
+                    </p>
+                  </div>
+                )}
                 <div className="mt-5 flex justify-end gap-2">
                   <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
                   <Button variant="solid-error" onClick={handleDeleteGroup} disabled={loading}>

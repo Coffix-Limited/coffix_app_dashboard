@@ -1,6 +1,7 @@
 import { EmailVariableGroup } from "../dashboard/emailTemplates/constants/emailVariables";
 
 const COLLECTION_GLOBAL_SETTINGS = "EQ0i4V6H47Ra7yMCdG7B";
+export const GLOBAL_COLLECTION_LOG_ID = "VmvT6HFpSMe6pC8AyyeR";
 const WEBAPP_VERSION = "1.0.0+52";
 
 export const EMAIL_VARIABLE_GROUPS: EmailVariableGroup[] = [
