@@ -25,6 +25,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ProductsFilterBar } from "./components/ProductsFilterBar";
 import { ImageUploadField } from "@/components/components/ImageUploadField";
+import { useAuth } from "@/app/lib/AuthContext";
 
 type NewProductForm = {
   name: string;
@@ -139,6 +140,7 @@ export default function ProductsPage() {
   const [filterCost, setFilterCost] = useState<NumberRange>({ min: "", max: "" });
   const [filterAvailableInStore, setFilterAvailableInStore] = useState("All");
   const [filterDisabledInStore, setFilterDisabledInStore] = useState("All");
+  const { currentStaff } = useAuth();
 
   function clearAllFilters() {
     setSearch("");
@@ -601,7 +603,7 @@ export default function ProductsPage() {
             {products.length} product{products.length !== 1 ? "s" : ""} total
           </p>
         </div>
-        <div className="flex gap-2">
+        {currentStaff?.role === "admin" && <div className="flex gap-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -609,14 +611,6 @@ export default function ProductsPage() {
             onChange={handleImportCSV}
             className="hidden"
           />
-{/* <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowImportInfo(true)}
-            disabled={importLoading}
-          >
-            {importLoading ? "Importing…" : "Import CSV"}
-          </Button> */}
           <Button
             variant="outline"
             onClick={exportToCSV}
@@ -626,7 +620,7 @@ export default function ProductsPage() {
           </Button>
           <Button
           onClick={() => setShowCreate(true)}>+ New Product</Button>
-        </div>
+        </div>}
       </div>
 
       <ProductsFilterBar

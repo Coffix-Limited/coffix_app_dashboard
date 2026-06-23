@@ -29,4 +29,5 @@ export interface AppUser {
   getPromotions?: boolean;
   allowWinACoffee?: boolean;
   allowCoffeeForHome?: boolean;
+  allowNotifications?: boolean;
 }

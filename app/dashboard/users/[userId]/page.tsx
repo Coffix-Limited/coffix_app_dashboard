@@ -81,6 +81,7 @@ type UserEditForm = {
   withdrawBalance: boolean;
   coffixCreditAvailable: boolean;
   allowCoffeeForHome: boolean;
+  allowNotifications: boolean;
 };
 
 type DialogMode = "edit-user" | null;
@@ -110,6 +111,7 @@ function userToForm(user: AppUser): UserEditForm {
     withdrawBalance: user.withdrawBalance ?? false,
     coffixCreditAvailable: user.coffixCreditAvailable ?? false,
     allowCoffeeForHome: user.allowCoffeeForHome ?? false,
+    allowNotifications: user.allowNotifications ?? false,
   };
 }
 
@@ -211,6 +213,7 @@ export default function UserDetailPage() {
         withdrawBalance: form.withdrawBalance,
         coffixCreditAvailable: form.coffixCreditAvailable,
         allowCoffeeForHome: form.allowCoffeeForHome,
+        allowNotifications: form.allowNotifications,
       });
       toast.success("User updated successfully.");
       closeDialog();
@@ -322,6 +325,7 @@ export default function UserDetailPage() {
             { label: "Withdraw Balance", value: formatBool(user.withdrawBalance) },
             { label: "Coffix Credit Available", value: formatBool(user.coffixCreditAvailable) },
             { label: "Allow Coffee for Home", value: formatBool(user.allowCoffeeForHome) },
+            { label: "Allow Notifications", value: formatBool(user.allowNotifications) },
           ]}
         />
 
@@ -493,6 +497,7 @@ export default function UserDetailPage() {
                       { key: "withdrawBalance", label: "Withdraw Balance" },
                       { key: "coffixCreditAvailable", label: "Coffix Credit Available" },
                       { key: "allowCoffeeForHome", label: "Allow Coffee for Home" },
+                      { key: "allowNotifications", label: "Allow Notifications" },
                     ] as { key: keyof UserEditForm; label: string }[]
                   ).map(({ key, label }) => (
                     <label key={key} className="flex cursor-pointer items-center justify-between px-3 py-2.5 hover:bg-[#fafafa]">
