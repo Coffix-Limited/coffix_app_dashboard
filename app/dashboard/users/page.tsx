@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { useUserStore } from "./store/useUserStore";
 import { useStoreStore } from "@/app/dashboard/stores/store/useStoreStore";
 import { useTransactionStore } from "@/app/dashboard/transactions/store/useTransactionStore";
-import { accumulateCoffixCredit, reconcileCoffixCredit } from "@/app/utils/coffixCredit";
+import { accumulateCoffixCredit, reconcileCoffixCredit, COFFIX_CREDIT_SIGN } from "@/app/utils/coffixCredit";
 import { UserService } from "./service/UserService";
 import { AppUser } from "./interface/user";
 import {
@@ -131,7 +131,8 @@ export default function UsersPage() {
   const accumulatedByUser = useMemo(() => {
     const userIds = new Set<string>();
     for (const tx of transactions) {
-      if (tx.paymentMethod !== "coffixCredit") continue;
+      const type = tx.type ?? "";
+      if (!COFFIX_CREDIT_SIGN[type] && type !== "gift") continue;
       if (tx.customerId) userIds.add(tx.customerId);
       if (tx.recipientCustomerId) userIds.add(tx.recipientCustomerId);
     }
@@ -678,11 +679,6 @@ export default function UsersPage() {
                     </td>
                     <td
                       className={`px-5 py-3 text-right tabular-nums ${reconciliation.matches ? "text-black" : "font-medium text-red-600"}`}
-                      title={
-                        reconciliation.matches
-                          ? undefined
-                          : `Mismatch — stored $${currentCredit.toFixed(2)} vs accumulated $${accumulatedCredit.toFixed(2)} (diff $${reconciliation.difference.toFixed(2)})`
-                      }
                     >
                       ${accumulatedCredit.toFixed(2)}
                       {!reconciliation.matches && <span className="ml-1">⚠</span>}

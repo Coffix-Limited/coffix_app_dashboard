@@ -47,7 +47,13 @@ function roundCents(value: number): number {
  * Returns 0 if the transaction's type is unknown or it doesn't affect this user.
  */
 export function signedCoffixAmount(tx: Transaction, userId: string): number {
-  const magnitude = Math.abs(tx.amount ?? 0);
+  const sign = COFFIX_CREDIT_SIGN[tx.type ?? ""];
+
+  // For credit-adding transactions, prefer totalAmount (amount + bonus) over amount.
+  // For spending/gift transactions, always use amount.
+  const rawAmount =
+    sign === 1 ? (tx.totalAmount ?? tx.amount ?? 0) : (tx.amount ?? 0);
+  const magnitude = Math.abs(rawAmount);
   if (magnitude === 0) return 0;
 
   // Gift / transfer: direction depends on who the user is.
@@ -57,15 +63,15 @@ export function signedCoffixAmount(tx: Transaction, userId: string): number {
     return 0;
   }
 
-  const sign = COFFIX_CREDIT_SIGN[tx.type ?? ""];
   if (!sign) return 0; // unknown type → ignored
   return sign * magnitude;
 }
 
 /**
  * Sum of all coffix-credit transactions for `userId`, re-deriving the balance.
- * Only `paymentMethod === "coffixCredit"` transactions tied to the user (as
- * customer or gift recipient) are counted.
+ * Credit-adding types (topup, refund, etc.) use `totalAmount` when available
+ * (which includes any topup bonus), falling back to `amount`.
+ * Spending types (order, purchase) only count when `paymentMethod === "coffixCredit"`.
  */
 export function accumulateCoffixCredit(
   transactions: Transaction[],
@@ -73,8 +79,10 @@ export function accumulateCoffixCredit(
 ): number {
   let total = 0;
   for (const tx of transactions) {
-    if (tx.paymentMethod !== "coffixCredit") continue;
     if (tx.customerId !== userId && tx.recipientCustomerId !== userId) continue;
+    const type = tx.type ?? "";
+    // Spending types only apply when the user actually paid with coffix credit
+    if (COFFIX_CREDIT_SIGN[type] === -1 && tx.paymentMethod !== "coffixCredit") continue;
     total += signedCoffixAmount(tx, userId);
   }
   return roundCents(total);
