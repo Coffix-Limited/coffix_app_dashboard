@@ -3,16 +3,52 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { WindcaveSession } from "../interface/windcave";
+import { TransactionStatus } from "../interface/transaction";
 import { formatDateTime } from "@/app/utils/formatting";
 import { InfoCard } from "./InfoCard";
+import { Button } from "@/components/ui/button";
 
 type WindcaveState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "loaded"; data: WindcaveSession };
 
-export function WindcaveSessionView({ sessionId }: { sessionId: string }) {
+export function WindcaveSessionView({
+  sessionId,
+  transactionStatus,
+}: {
+  sessionId: string;
+  transactionStatus?: TransactionStatus | null;
+}) {
   const [state, setState] = useState<WindcaveState>({ status: "loading" });
+  const [triggering, setTriggering] = useState(false);
+
+  const canTrigger = transactionStatus === "created";
+
+
+  async function handleTriggerWebhook() {
+    if (!canTrigger) return;
+    setTriggering(true);
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/webhook/?sessionId=${encodeURIComponent(sessionId)}`,
+        { method: "GET"}
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.message ?? `Error ${res.status}`);
+      }
+      toast.success("Webhook triggered", {
+        description: `Webhook re-sent for session ${sessionId}.`,
+      });
+    } catch (err) {
+      toast.error("Failed to trigger webhook", {
+        description: err instanceof Error ? err.message : "Something went wrong.",
+      });
+    } finally {
+      setTriggering(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -58,7 +94,19 @@ export function WindcaveSessionView({ sessionId }: { sessionId: string }) {
   const txns = data.transactions ?? [];
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleTriggerWebhook}
+          disabled={!canTrigger || triggering}
+        >
+          {triggering ? "Triggering…" : "Trigger Webhook"}
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <InfoCard
         title="Session"
         rows={[
@@ -99,6 +147,7 @@ export function WindcaveSessionView({ sessionId }: { sessionId: string }) {
           {JSON.stringify(data, null, 2)}
         </pre>
       </details> */}
+      </div>
     </div>
   );
 }

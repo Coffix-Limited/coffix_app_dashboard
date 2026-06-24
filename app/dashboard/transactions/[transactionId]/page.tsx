@@ -315,7 +315,7 @@ export default function TransactionDetailPage() {
 
         <TabsContent value="windcave">
           {windcaveSessionId && (
-            <WindcaveSessionView key={windcaveSessionId} sessionId={windcaveSessionId} />
+            <WindcaveSessionView key={windcaveSessionId} sessionId={windcaveSessionId} transactionStatus={tx.status} />
           )}
         </TabsContent>
       </Tabs>

@@ -22,6 +22,7 @@ type StoreEditForm = {
   contactNumber: string;
   location: string;
   address: string;
+  city: string;
   imageUrl: string;
   gstNumber: string;
   invoiceText: string;
@@ -67,6 +68,7 @@ function storeToForm(store: Store): StoreEditForm {
     contactNumber: store.contactNumber ?? "",
     location: store.location ?? "",
     address: store.address ?? "",
+    city: store.city ?? "",
     imageUrl: store.imageUrl ?? "",
     gstNumber: store.gstNumber ?? "",
     invoiceText: store.invoiceText ?? "",
@@ -277,6 +279,7 @@ export default function StoreDetailPage() {
         contactNumber: form.contactNumber.trim(),
         location: form.location.trim(),
         address: form.address.trim(),
+        city: form.city.trim() || null,
         ...(form.imageUrl.trim() ? { imageUrl: form.imageUrl.trim() } : { imageUrl: "" }),
         gstNumber: form.gstNumber.trim() || undefined,
         invoiceText: form.invoiceText.trim() || undefined,
@@ -380,6 +383,7 @@ export default function StoreDetailPage() {
               { label: "Contact", value: store.contactNumber },
               { label: "Location", value: store.location },
               { label: "Address", value: store.address },
+              { label: "City", value: store.city },
               { label: "GST Number", value: store.gstNumber },
               { label: "Invoice Text", value: store.invoiceText },
               { label: "Printer ID", value: store.printerId },
@@ -565,6 +569,15 @@ export default function StoreDetailPage() {
                     onChange={(e) => setField("address", e.target.value)}
                   />
                   {errors.address && <p className="mt-1 text-xs text-error">Required.</p>}
+                </div>
+
+                <div className="col-span-2">
+                  <label className="mb-1.5 block text-xs text-light-grey">City</label>
+                  <input
+                    className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
+                    value={form.city}
+                    onChange={(e) => setField("city", e.target.value)}
+                  />
                 </div>
 
                 <div>

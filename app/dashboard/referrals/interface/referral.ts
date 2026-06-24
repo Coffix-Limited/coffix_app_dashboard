@@ -1,7 +1,11 @@
 export interface Referral {
+  couponId?: string | null;
   docId?: string;
+  referee?: string;
+  refereeCouponId?: string | null;
   referralTime?: Date;
   referrer?: string;
-  referee?: string;
-  disabled?: boolean;
+  signupTime?: Date;
+  status?: string;
+  validTime?: Date;
 }
