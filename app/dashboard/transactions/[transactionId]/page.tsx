@@ -232,7 +232,7 @@ export default function TransactionDetailPage() {
             { label: "GST", value: tx.paymentMethod === "coffixCredit" ? "" : tx.gst != null ? `${tx.gst}%` : "—" },
             { label: "GST Amount", value: tx.paymentMethod === "coffixCredit" ? "" : tx.gstAmount != null ? `$${tx.gstAmount.toFixed(2)}` : "—" },
             { label: "GST Number", value: tx.paymentMethod === "coffixCredit" ? "" : tx.gstNumber != null ? String(tx.gstNumber) : "—" },
-            { label: "Windcave Session Id", value: tx.paymentId ?? "—", mono: true },
+            { label: "Windcave Session Id", value: tx.sessionId ?? "—", mono: true },
             { label: "Payment Time", value: formatDateTime(tx.paymentTime) },
             { label: "Created At", value: formatDateTime(tx.createdAt) },
             ...(tx.type === "refund"
