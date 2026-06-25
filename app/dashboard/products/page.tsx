@@ -711,7 +711,7 @@ export default function ProductsPage() {
               >
                 Cost {sortKey === "cost" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
               </th>
-              <th className="w-10 px-4 py-3" />
+              {currentStaff?.role === "admin" && <th className="w-10 px-4 py-3" />}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -783,18 +783,20 @@ export default function ProductsPage() {
                     <td className="px-5 py-3 text-right text-black">
                       ${(product.cost ?? 0).toFixed(2)}
                     </td>
-                    <td className="w-10 px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        title="Duplicate product"
-                        onClick={() => handleCopyProduct(product)}
-                        className="opacity-0 group-hover:opacity-100 rounded-lg p-1.5 text-black transition-opacity hover:bg-[#f0f0f0] hover:text-black"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                        </svg>
-                      </button>
-                    </td>
+                    {currentStaff?.role === "admin" && (
+                      <td className="w-10 px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          title="Duplicate product"
+                          onClick={() => handleCopyProduct(product)}
+                          className="opacity-0 group-hover:opacity-100 rounded-lg p-1.5 text-black transition-opacity hover:bg-[#f0f0f0] hover:text-black"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                          </svg>
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })
