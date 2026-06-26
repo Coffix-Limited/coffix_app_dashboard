@@ -2,8 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CouponService } from "../service/CouponService";
-import { Coupon } from "../interface/coupon";
 import { Button } from "@/components/ui/button";
 
 interface Store {
@@ -21,7 +19,7 @@ interface AddCouponDialogProps {
 
 const EMPTY_FORM = { type: "", amount: "", expiryDate: "", storeId: "", notes: "" };
 
-export function AddCouponDialog({ open, onClose, stores, userIds, defaultEmails }: AddCouponDialogProps) {
+export function AddCouponDialog({ open, onClose, stores, defaultEmails }: AddCouponDialogProps) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [customerEmails, setCustomerEmails] = useState<string[]>([]);
   const [emailInput, setEmailInput] = useState("");
@@ -62,40 +60,57 @@ export function AddCouponDialog({ open, onClose, stores, userIds, defaultEmails 
   }
 
   async function handleCreate() {
+    if (!form.type.trim()) {
+      toast.error("Type is required.");
+      return;
+    }
+    const amt = parseFloat(form.amount);
+    if (isNaN(amt) || amt < 0) {
+      toast.error("Amount is required.");
+      return;
+    }
+    if (customerEmails.length === 0) {
+      toast.error("At least one customer email is required.");
+      return;
+    }
+    if (!form.expiryDate) {
+      toast.error("Expiry date is required.");
+      return;
+    }
     setLoading(true);
     try {
-      const base: Omit<Coupon, "docId"> = { createdAt: new Date() };
-      if (form.type.trim()) base.type = form.type.trim();
-      const amt = parseFloat(form.amount);
-      if (!isNaN(amt) && amt >= 0) base.amount = amt;
-      if (form.expiryDate) {
-        const d = new Date(form.expiryDate + "T00:00:00");
-        if (!isNaN(d.getTime())) base.expiryDate = d;
-      }
-      if (form.storeId) base.storeId = form.storeId;
-      if (form.notes.trim()) base.notes = form.notes.trim();
+      const payload: {
+        type?: string;
+        amount?: number;
+        expiryDate: string;
+        storeId?: string;
+        notes?: string;
+        customerEmail?: string[];
+      } = {
+        type: form.type.trim(),
+        amount: amt,
+        // Always 11:59 PM (Asia/Manila) of the selected date, regardless of the date chosen.
+        expiryDate: `${form.expiryDate}T23:59:59+08:00`,
+        customerEmail: customerEmails,
+      };
+      if (form.storeId) payload.storeId = form.storeId;
+      if (form.notes.trim()) payload.notes = form.notes.trim();
 
-      if (userIds && userIds.length > 0) {
-        await Promise.all(
-          userIds.map((userId, i) =>
-            CouponService.createCoupon({
-              ...base,
-              userId,
-              ...(customerEmails[i] ? { customerEmail: customerEmails[i] } : {}),
-            })
-          )
-        );
-        toast.success(`${userIds.length} coupon(s) created.`);
-      } else {
-        await CouponService.createCoupon({
-          ...base,
-          ...(customerEmails[0] ? { customerEmail: customerEmails[0] } : {}),
-        });
-        toast.success("Coupon created.");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/coupon`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.message ?? `Error ${res.status}`);
       }
+      toast.success("Coupon created.");
       onClose();
-    } catch {
-      toast.error("Failed to create coupon.");
+    } catch (err) {
+      toast.error("Failed to create coupon.", {
+        description: err instanceof Error ? err.message : "Something went wrong.",
+      });
     } finally {
       setLoading(false);
     }
@@ -119,7 +134,9 @@ export function AddCouponDialog({ open, onClose, stores, userIds, defaultEmails 
         <div className="max-h-[72vh] space-y-4 overflow-y-auto px-6 py-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1.5 block text-xs text-light-grey">Type</label>
+              <label className="mb-1.5 block text-xs text-light-grey">
+                Type <span className="text-red-500">*</span>
+              </label>
               <select
                 className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-black outline-none focus:border-primary"
                 value={form.type}
@@ -131,7 +148,9 @@ export function AddCouponDialog({ open, onClose, stores, userIds, defaultEmails 
               </select>
             </div>
             <div>
-              <label className="mb-1.5 block text-xs text-light-grey">Amount ($)</label>
+              <label className="mb-1.5 block text-xs text-light-grey">
+                Amount ($) <span className="text-red-500">*</span>
+              </label>
               <input
                 type="number"
                 min="0"
@@ -143,7 +162,9 @@ export function AddCouponDialog({ open, onClose, stores, userIds, defaultEmails 
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs text-light-grey">Expiry Date</label>
+              <label className="mb-1.5 block text-xs text-light-grey">
+                Expiry Date <span className="text-red-500">*</span>
+              </label>
               <input
                 type="date"
                 className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
@@ -165,29 +186,35 @@ export function AddCouponDialog({ open, onClose, stores, userIds, defaultEmails 
               </select>
             </div>
             <div className="col-span-2">
-              <label className="mb-1.5 block text-xs text-light-grey">Customer Email</label>
-              <div className="min-h-[42px] flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-2 focus-within:border-primary">
-                {customerEmails.map((email) => (
-                  <span
-                    key={email}
-                    className="flex items-center gap-1 rounded-md bg-background border border-border px-2 py-0.5 text-xs text-black"
-                  >
-                    {email}
-                    <button
-                      type="button"
-                      onClick={() => removeEmail(email)}
-                      className="ml-0.5 text-light-grey hover:text-black leading-none"
+              {customerEmails.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {customerEmails.map((email) => (
+                    <span
+                      key={email}
+                      className="flex items-center gap-1 rounded-md bg-background border border-border px-2 py-0.5 text-xs text-black"
                     >
-                      ×
-                    </button>
-                  </span>
-                ))}
+                      {email}
+                      <button
+                        type="button"
+                        onClick={() => removeEmail(email)}
+                        className="ml-0.5 text-light-grey hover:text-black leading-none"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <label className="mb-1.5 block text-xs text-light-grey">
+                Customer Email <span className="text-red-500">*</span>
+              </label>
+              <div className="min-h-[42px] flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-2 focus-within:border-primary">
                 <div className="flex flex-1 items-center gap-1 min-w-[140px]">
                   <input
                     ref={emailInputRef}
                     type="email"
                     placeholder={customerEmails.length === 0 ? "customer@example.com" : ""}
-                    className="flex-1 text-sm text-black outline-none placeholder:text-light-grey bg-transparent"
+                    className="flex-1 text-sm text-black outline-none bg-transparent"
                     value={emailInput}
                     onChange={(e) => setEmailInput(e.target.value)}
                     onKeyDown={handleEmailKeyDown}

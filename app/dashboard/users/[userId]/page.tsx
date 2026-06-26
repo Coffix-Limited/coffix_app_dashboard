@@ -173,7 +173,7 @@ export default function UserDetailPage() {
     if (form.qrId.trim() && !/^\d{4}-\d{4}-\d{4}-\d{4}$/.test(form.qrId.trim())) {
       newErrors.qrId = true;
     }
-    if (form.appVersion.trim() && !/^\d+\.\d+\.\d+\+\d+$/.test(form.appVersion.trim())) {
+    if (form.appVersion.trim() && !/^\d+\.\d+\.\d+.*$/.test(form.appVersion.trim())) {
       newErrors.appVersion = true;
     }
 
@@ -451,7 +451,7 @@ export default function UserDetailPage() {
                 </div>
                 <div>
                   <label className={`mb-1.5 block text-xs ${errors.appVersion ? "text-red-500" : "text-light-grey"}`}>
-                    App Version {errors.appVersion && <span className="text-red-500">— must be x.x.x+x</span>}
+                    App Version {errors.appVersion && <span className="text-red-500">— must start with x.x.x</span>}
                   </label>
                   <input
                     className={`w-full rounded-lg border px-3 py-2 text-sm text-black outline-none focus:border-primary font-mono ${errors.appVersion ? "border-red-400" : "border-border"}`}
