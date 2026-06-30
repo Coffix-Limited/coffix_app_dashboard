@@ -49,6 +49,6 @@ export const EMAIL_VARIABLE_GROUPS: EmailVariableGroup[] = [
   },
 ];
 
-export const SUBJECT_VARIABLES = ["transaction_number", "store_name"];
+export const SUBJECT_VARIABLES = ["transaction_number", "store_name", "name"];
 
 export { COLLECTION_GLOBAL_SETTINGS, WEBAPP_VERSION };
