@@ -228,7 +228,7 @@ export default function TransactionDetailPage() {
               ? [{ label: "Refund Status", value: isRefunded ? "Refunded" : "Not Refunded" }]
               : []),
             { label: "Amount", value: tx.amount != null ? `$${tx.amount.toFixed(2)}` : "—" },
-            { label: "Total Amount", value: tx.totalAmount != null ? `$${tx.totalAmount.toFixed(2)}` : "—" },
+            { label: "Coffix Credit amount", value: tx.totalAmount != null ? `$${tx.totalAmount.toFixed(2)}` : "—" },
             { label: "GST", value: tx.paymentMethod === "coffixCredit" ? "" : tx.gst != null ? `${tx.gst}%` : "—" },
             { label: "GST Amount", value: tx.paymentMethod === "coffixCredit" ? "" : tx.gstAmount != null ? `$${tx.gstAmount.toFixed(2)}` : "—" },
             { label: "GST Number", value: tx.paymentMethod === "coffixCredit" ? "" : tx.gstNumber != null ? String(tx.gstNumber) : "—" },

@@ -292,14 +292,20 @@ export default function ProductsPage() {
       return true;
     });
     result = [...result].sort((a, b) => {
+      // Category is always the primary grouping key so same-category
+      // products stay together regardless of the active sort column.
+      const catCmp = (getCategoryName(a.categoryId) ?? "").localeCompare(
+        getCategoryName(b.categoryId) ?? "",
+      );
+      if (catCmp !== 0) return catCmp;
+
+      // Within a category, order by the active sort column.
       let cmp = 0;
-      if (sortKey === "name") cmp = (a.order ?? 0) - (b.order ?? 0) || (a.name ?? "").localeCompare(b.name ?? "");
-      else if (sortKey === "price") cmp = (a.price ?? 0) - (b.price ?? 0);
+      if (sortKey === "price") cmp = (a.price ?? 0) - (b.price ?? 0);
       else if (sortKey === "cost") cmp = (a.cost ?? 0) - (b.cost ?? 0);
-      else if (sortKey === "category")
-        cmp =
-          (getCategoryName(a.categoryId) ?? "").localeCompare(getCategoryName(b.categoryId) ?? "") ||
-          (a.order ?? 0) - (b.order ?? 0);
+      else // "name" and "category" both fall back to manual order then name
+        cmp = (a.order ?? 0) - (b.order ?? 0) || (a.name ?? "").localeCompare(b.name ?? "");
+
       return sortDir === "asc" ? cmp : -cmp;
     });
     return result;

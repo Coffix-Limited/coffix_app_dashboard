@@ -66,6 +66,7 @@ const emptyForm: StoreForm = {
 
 const REQUIRED: (keyof Omit<StoreForm, "openingHours">)[] = [
   "name", "email", "contactNumber", "location", "address", "printerId",
+  "gstNumber", "invoiceText",
 ];
 
 export default function StoresPage() {
@@ -359,8 +360,8 @@ export default function StoresPage() {
         address: form.address.trim(),
         city: form.city.trim() || null,
         imageUrl: form.imageUrl.trim() || null,
-        gstNumber: form.gstNumber.trim() || null,
-        invoiceText: form.invoiceText.trim() || null,
+        gstNumber: form.gstNumber.trim(),
+        invoiceText: form.invoiceText.trim(),
         printerId: form.printerId.trim(),
         openingHours,
         disable: false,
@@ -629,23 +630,23 @@ export default function StoresPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs text-light-grey">GST Number</label>
+                  <label className="mb-1.5 block text-xs text-light-grey">GST Number *</label>
                   <input
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
-                    placeholder="Optional"
+                    className={`w-full rounded-lg border px-3 py-2 text-sm text-black outline-none focus:border-primary ${errors.gstNumber ? "border-error" : "border-border"}`}
                     value={form.gstNumber}
                     onChange={(e) => setField("gstNumber", e.target.value)}
                   />
+                  {errors.gstNumber && <p className="mt-1 text-xs text-error">Required.</p>}
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs text-light-grey">Invoice Text</label>
+                  <label className="mb-1.5 block text-xs text-light-grey">Invoice Text *</label>
                   <input
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
-                    placeholder="Optional"
+                    className={`w-full rounded-lg border px-3 py-2 text-sm text-black outline-none focus:border-primary ${errors.invoiceText ? "border-error" : "border-border"}`}
                     value={form.invoiceText}
                     onChange={(e) => setField("invoiceText", e.target.value)}
                   />
+                  {errors.invoiceText && <p className="mt-1 text-xs text-error">Required.</p>}
                 </div>
 
                 <div>

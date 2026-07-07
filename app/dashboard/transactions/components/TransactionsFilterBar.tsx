@@ -2,16 +2,27 @@
 
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { DateInput } from "@/components/ui/DateInput";
+import { Popover as PopoverPrimitive } from "radix-ui";
+import { ChevronDownIcon } from "lucide-react";
 
 type DateRange = { from: string; to: string };
 type NumberRange = { min: string; max: string };
+
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: "created", label: "Created" },
+  { value: "paid", label: "Paid" },
+  { value: "failed", label: "Failed" },
+  { value: "approved", label: "Approved" },
+  { value: "declined", label: "Declined" },
+  { value: "completed", label: "Completed" },
+];
 
 interface TransactionsFilterBarProps {
   search: string; setSearch: (v: string) => void;
   typeFilter: string; setTypeFilter: (v: string) => void;
   uniqueTypes: string[];
   methodFilter: string; setMethodFilter: (v: string) => void;
-  filterStatus: string; setFilterStatus: (v: string) => void;
+  filterStatus: Set<string>; setFilterStatus: (v: Set<string>) => void;
   filterCreatedAt: DateRange; setFilterCreatedAt: (v: DateRange | ((p: DateRange) => DateRange)) => void;
   filterAmount: NumberRange; setFilterAmount: (v: NumberRange | ((p: NumberRange) => NumberRange)) => void;
   filterTotalAmount: NumberRange; setFilterTotalAmount: (v: NumberRange | ((p: NumberRange) => NumberRange)) => void;
@@ -35,6 +46,20 @@ export function TransactionsFilterBar({
   anyFilterActive,
   clearAllFilters,
 }: TransactionsFilterBarProps) {
+  function toggleStatus(value: string) {
+    const next = new Set(filterStatus);
+    if (next.has(value)) next.delete(value);
+    else next.add(value);
+    setFilterStatus(next);
+  }
+
+  const statusSummary =
+    filterStatus.size === 0
+      ? "All Statuses"
+      : filterStatus.size === 1
+        ? STATUS_OPTIONS.find((o) => filterStatus.has(o.value))?.label ?? "1 selected"
+        : `${filterStatus.size} selected`;
+
   return (
     <div className="overflow-x-auto lg:overflow-x-visible">
       <div className="flex items-end gap-2 pb-1 min-w-max lg:min-w-0 lg:flex-wrap">
@@ -90,23 +115,38 @@ export function TransactionsFilterBar({
         </div>
 
         {/* Status */}
-        <div className={`flex flex-col gap-1 rounded-lg border bg-white px-3 py-1.5 min-w-[140px] ${filterStatus !== "All" ? "border-primary" : "border-border"}`}>
+        <div className={`flex flex-col gap-1 rounded-lg border bg-white px-3 py-1.5 min-w-[160px] ${filterStatus.size > 0 ? "border-primary" : "border-border"}`}>
           <span className="flex items-center justify-between text-[10px] font-medium uppercase tracking-wide text-light-grey">
             Status
-            {filterStatus !== "All" && <button onClick={() => setFilterStatus("All")} className="ml-1 text-light-grey hover:text-black">×</button>}
+            {filterStatus.size > 0 && <button onClick={() => setFilterStatus(new Set())} className="ml-1 text-light-grey hover:text-black">×</button>}
           </span>
-          <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All Statuses</SelectItem>
-              <SelectItem value="created">Created</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="failed">Failed</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="declined">Declined</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-            </SelectContent>
-          </Select>
+          <PopoverPrimitive.Root>
+            <PopoverPrimitive.Trigger className="flex h-7 w-full cursor-pointer items-center justify-between gap-1 rounded-md bg-transparent text-sm outline-none">
+              <span className={filterStatus.size === 0 ? "text-light-grey" : "text-black"}>{statusSummary}</span>
+              <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 text-light-grey" />
+            </PopoverPrimitive.Trigger>
+            <PopoverPrimitive.Portal>
+              <PopoverPrimitive.Content
+                align="start"
+                sideOffset={4}
+                className="z-50 min-w-[8rem] rounded-lg border border-border bg-white p-1 shadow-(--shadow) data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+              >
+                <div className="flex flex-col gap-1 p-1">
+                  {STATUS_OPTIONS.map(({ value, label }) => (
+                    <label key={value} className="flex items-center gap-2 text-sm text-black cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={filterStatus.has(value)}
+                        onChange={() => toggleStatus(value)}
+                        className="h-3.5 w-3.5 accent-primary"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </PopoverPrimitive.Content>
+            </PopoverPrimitive.Portal>
+          </PopoverPrimitive.Root>
         </div>
 
         {/* Created At */}

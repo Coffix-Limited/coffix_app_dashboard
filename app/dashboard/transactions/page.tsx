@@ -51,7 +51,7 @@ export default function TransactionsPage() {
   const [invoicing, setInvoicing] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
-  const [filterStatus, setFilterStatus] = useState("All");
+  const [filterStatus, setFilterStatus] = useState<Set<string>>(new Set());
   const [filterCreatedAt, setFilterCreatedAt] = useState<DateRange>({ from: "", to: "" });
   const [filterAmount, setFilterAmount] = useState<NumberRange>({ min: "", max: "" });
   const [filterTotalAmount, setFilterTotalAmount] = useState<NumberRange>({ min: "", max: "" });
@@ -68,7 +68,7 @@ export default function TransactionsPage() {
       search.trim() !== "" ||
       typeFilter !== "All" ||
       methodFilter !== "All" ||
-      filterStatus !== "All" ||
+      filterStatus.size > 0 ||
       filterCreatedAt.from !== "" || filterCreatedAt.to !== "" ||
       filterAmount.min !== "" || filterAmount.max !== "" ||
       filterTotalAmount.min !== "" || filterTotalAmount.max !== "" ||
@@ -82,7 +82,7 @@ export default function TransactionsPage() {
     setSearch("");
     setTypeFilter("All");
     setMethodFilter("All");
-    setFilterStatus("All");
+    setFilterStatus(new Set());
     setFilterCreatedAt({ from: "", to: "" });
     setFilterAmount({ min: "", max: "" });
     setFilterTotalAmount({ min: "", max: "" });
@@ -173,7 +173,7 @@ export default function TransactionsPage() {
         const num = (tx.transactionNumber ?? "").toLowerCase();
         if (!email.includes(q) && !num.includes(q)) return false;
       }
-      if (filterStatus !== "All" && tx.status !== filterStatus) return false;
+      if (filterStatus.size > 0 && !filterStatus.has(tx.status ?? "")) return false;
       if (!dateInRange(tx.createdAt ?? undefined, filterCreatedAt.from, filterCreatedAt.to)) return false;
       if (filterAmount.min !== "") {
         const min = parseFloat(filterAmount.min);
