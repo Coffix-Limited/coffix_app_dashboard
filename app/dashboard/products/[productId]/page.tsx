@@ -304,7 +304,7 @@ export default function ProductDetailPage() {
 
                     {/* ── Status Controls ── */}
                     <div className="rounded-xl border border-border bg-white p-4 shadow-(--shadow) space-y-4">
-                        <p className="text-xs font-bold uppercase tracking-wide text-black">Availability</p>
+                        <p className="text-xs font-bold uppercase tracking-wide text-black">Temporary Availability (Enabled by Midnight)</p>
 
                         {/* Product disable — admin only */}
                         <div className="flex items-start justify-between gap-3">

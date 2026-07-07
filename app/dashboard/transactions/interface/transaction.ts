@@ -38,4 +38,6 @@ export interface Transaction {
   gstNumber?: number | null;
 
   originalTransactionNumber?: string | null;
+  couponDiscount?: number | null;
+  couponIds?: string[];
 }
