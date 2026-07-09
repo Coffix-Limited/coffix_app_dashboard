@@ -12,6 +12,7 @@ import { useAuth } from "@/app/lib/AuthContext";
 import { toast } from "sonner";
 import { TransactionService } from "./service/TransactionService";
 import { TransactionsFilterBar } from "./components/TransactionsFilterBar";
+import { AddTransactionDialog } from "./components/AddTransactionDialog";
 import { EnumChip } from "@/components/ui/StatusChip";
 
 type DateRange = { from: string; to: string };
@@ -49,6 +50,7 @@ export default function TransactionsPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [invoicing, setInvoicing] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
   const [filterStatus, setFilterStatus] = useState<Set<string>>(new Set());
@@ -226,6 +228,7 @@ export default function TransactionsPage() {
       coffixCredit: "Coffix Credit",
       card: "Credit Card",
       wallet: "Wallet",
+      cash: "Cash",
     };
     const headers = ["transactionNumber", "createdAt", "paymentMethod", "type", "customerId", "amount", "status", "orderId", "gst", "gstAmount", "totalAmount", "recipientEmail"];
     const rows = displayed.map((tx) =>
@@ -265,6 +268,7 @@ export default function TransactionsPage() {
           <Button variant="outline" onClick={exportToCSV} disabled={displayed.length === 0}>
             Export CSV
           </Button>
+          <Button onClick={() => setAddOpen(true)}>Add Transaction</Button>
         </div>
       </div>
 
@@ -364,6 +368,8 @@ export default function TransactionsPage() {
           </tbody>
         </table>
       </div>
+
+      <AddTransactionDialog open={addOpen} onClose={() => setAddOpen(false)} />
     </div>
   );
 }

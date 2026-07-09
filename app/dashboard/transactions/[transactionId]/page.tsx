@@ -29,11 +29,13 @@ function PaymentMethodBadge({ method }: { method: PaymentMethod | null | undefin
     coffixCredit: "bg-primary text-white",
     card: "bg-black text-white",
     wallet: "border border-border text-black",
+    cash: "bg-green-600 text-white",
   };
   const labels: Record<PaymentMethod, string> = {
     coffixCredit: "Coffix Credit",
     card: "Card",
     wallet: "Wallet",
+    cash: "Cash",
   };
   return (
     <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${styles[method]}`}>
@@ -148,7 +150,7 @@ export default function TransactionDetailPage() {
         </div>
         <div className="flex flex-col items-end gap-2 pt-6">
           <PaymentMethodBadge method={tx.paymentMethod} />
-          {tx.type === "order" && (
+          {tx.type === "order" && tx.isManual !== true && (
             <>
               {isRefunded ? (
                 <span className="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
@@ -235,6 +237,7 @@ export default function TransactionDetailPage() {
             { label: "Windcave Session Id", value: tx.sessionId ?? "—", mono: true },
             { label: "Payment Time", value: formatDateTime(tx.paymentTime) },
             { label: "Created At", value: formatDateTime(tx.createdAt) },
+            { label: "Notes", value: tx.notes || "—" },
             ...(tx.type === "refund"
               ? [{ label: "Original Transaction #", value: tx.originalTransactionNumber ?? "—", mono: true }]
               : []),

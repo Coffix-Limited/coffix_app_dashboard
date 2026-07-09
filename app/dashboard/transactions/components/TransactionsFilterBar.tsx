@@ -15,6 +15,10 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "approved", label: "Approved" },
   { value: "declined", label: "Declined" },
   { value: "completed", label: "Completed" },
+  { value: "claimed", label: "Claimed" },
+  { value: "pending", label: "Pending" },
+  { value: "sent", label: "Sent" },
+  { value: "expired", label: "Expired" },
 ];
 
 interface TransactionsFilterBarProps {
@@ -110,6 +114,7 @@ export function TransactionsFilterBar({
               <SelectItem value="All">All Methods</SelectItem>
               <SelectItem value="coffixCredit">Coffix Credit</SelectItem>
               <SelectItem value="card">Credit Card</SelectItem>
+              <SelectItem value="cash">Cash</SelectItem>
             </SelectContent>
           </Select>
         </div>

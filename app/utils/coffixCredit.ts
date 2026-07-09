@@ -78,10 +78,14 @@ export function signedCoffixAmount(tx: Transaction, userId: string): number {
 
 /**
  * Sum of all coffix-credit transactions for `userId`, re-deriving the balance.
- * Credit-adding types (topup, refund, etc.) use `totalAmount` when available
- * (which includes any topup bonus), falling back to `amount`.
- * Spending types (order, purchase) only count when `paymentMethod === "coffixCredit"`,
- * and are netted against `couponDiscount` (see signedCoffixAmount).
+ * Both credit-adding types (topup, refund, etc.) and spending types (order,
+ * purchase) only count when `paymentMethod === "coffixCredit"` — the money must
+ * have actually moved through coffix credit. A cash/card refund or topup does
+ * not touch the coffix balance and is ignored here. Credit-adds use `totalAmount`
+ * when available (which includes any topup bonus), falling back to `amount`;
+ * spending is netted against `couponDiscount` (see signedCoffixAmount).
+ * `gift` is exempt from the payment-method gate — it is an inherently
+ * coffix-credit transfer handled separately in signedCoffixAmount.
  */
 export function accumulateCoffixCredit(
   transactions: Transaction[],
@@ -91,8 +95,10 @@ export function accumulateCoffixCredit(
   for (const tx of transactions) {
     if (tx.customerId !== userId && tx.recipientCustomerId !== userId) continue;
     const type = tx.type ?? "";
-    // Spending types only apply when the user actually paid with coffix credit
-    if (COFFIX_CREDIT_SIGN[type] === -1 && tx.paymentMethod !== "coffixCredit") continue;
+    // coffix-credit adds AND spends only count when the money actually moved
+    // through coffix credit — a cash/card refund or topup must NOT change the
+    // accumulated coffix balance. (gift is handled separately and is exempt.)
+    if (COFFIX_CREDIT_SIGN[type] && tx.paymentMethod !== "coffixCredit") continue;
     total += signedCoffixAmount(tx, userId);
   }
   return roundCents(total);

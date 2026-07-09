@@ -606,7 +606,8 @@ export default function UsersPage() {
       )}
 
       <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
-        <table className="w-full table-fixed text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] table-fixed text-sm">
           <thead>
             <tr className="border-b border-border bg-background">
               <th className="w-10 px-5 py-3">
@@ -689,6 +690,7 @@ export default function UsersPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       <Dialog open={showAddCredits} onOpenChange={(open) => { if (!open) { setShowAddCredits(false); setCreditAmount(""); } }}>

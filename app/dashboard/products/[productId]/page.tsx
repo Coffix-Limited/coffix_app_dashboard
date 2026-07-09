@@ -10,6 +10,7 @@ import { Product } from "../interface/product";
 import { ProductService } from "../service/ProductService";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { ImageUploadField } from "@/components/components/ImageUploadField";
 type DialogMode = "edit-product" | "delete-product" | "add-modifier" | "remove-modifier-group" | null;
 
@@ -234,7 +235,7 @@ export default function ProductDetailPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-start justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <Button
                         variant="outline"
@@ -243,7 +244,7 @@ export default function ProductDetailPage() {
                     >
                         ← Back to Products
                     </Button>
-                    <h1 className="text-2xl font-semibold text-black">{product.name ?? "—"}</h1>
+                    <h1 className="text-xl font-semibold text-black sm:text-2xl">{product.name ?? "—"}</h1>
                     <p className="mt-1 text-sm text-black">{getCategoryName(product.categoryId)}</p>
                 </div>
                 {isAdmin && (
@@ -307,19 +308,19 @@ export default function ProductDetailPage() {
                         <p className="text-xs font-bold uppercase tracking-wide text-black">Temporary Availability (Enabled by Midnight)</p>
 
                         {/* Product disable — admin only */}
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center justify-between gap-3">
                             <div>
                                 <p className="text-sm font-medium text-black">Product Availability</p>
                             </div>
                             {isAdmin ? (
-                                <Button
-                                    size="xs"
-                                    variant={isAllDisabled ? "solid-success" : "solid-error"}
-                                    onClick={handleToggleAllStores}
-                                    disabled={statusLoading}
-                                >
-                                    {isAllDisabled ? "Click to enable for All Stores" : "Click to disable for All Stores"}
-                                </Button>
+                                <div className="flex shrink-0 items-center gap-2">
+                                    <Switch
+                                        checked={!isAllDisabled}
+                                        onCheckedChange={handleToggleAllStores}
+                                        disabled={statusLoading}
+                                        aria-label="Toggle availability for all stores"
+                                    />
+                                </div>
                             ) : (
                                 <span className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
                                     isAllDisabled
@@ -339,20 +340,19 @@ export default function ProductDetailPage() {
                                     {assignedStoreIds.map((storeId) => {
                                         const store = stores.find((s) => s.docId === storeId);
                                         const isDisabled = disabledStores.includes(storeId);
-                                        return (
-                                            <div key={storeId} className="flex items-center justify-between px-3 py-2.5">
-                                                <span className="text-sm text-black">{store?.name ?? storeId}</span>
-                                                <Button
-                                                    size="xs"
-                                                    variant={isDisabled ? "solid-error" : "solid-success"}
-                                                    onClick={() => handleToggleStoreDisable(storeId)}
-                                                    disabled={statusLoading}
-                                                    className="rounded-full"
-                                                >
-                                                    {isDisabled ? "Click to enable for this Store" : "Click to disable for this Store"}
-                                                </Button>
+                                        return store ? (
+                                            <div key={storeId} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                                                <span className="min-w-0 break-words text-sm text-black">{store?.name ?? storeId}</span>
+                                                <div className="flex shrink-0 items-center gap-2">
+                                                    <Switch
+                                                        checked={!isDisabled}
+                                                        onCheckedChange={() => handleToggleStoreDisable(storeId)}
+                                                        disabled={statusLoading}
+                                                        aria-label={`Toggle availability for ${store?.name ?? storeId}`}
+                                                    />
+                                                </div>
                                             </div>
-                                        );
+                                        ) : null;
                                     })}
                                 </div>
                             </div>
@@ -362,7 +362,7 @@ export default function ProductDetailPage() {
 
                 {/* Right column: modifier groups */}
                 <div className="lg:col-span-2 space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                         <h2 className="font-semibold text-black">Modifier Groups</h2>
                         {isAdmin && (
                             <Button onClick={openAddModifier} size="sm">
@@ -384,9 +384,9 @@ export default function ProductDetailPage() {
                                     onDragStart={() => { if (isAdmin) dragIndex.current = i; }}
                                     onDragOver={(e) => e.preventDefault()}
                                     onDrop={() => { if (isAdmin) handleDrop(i); }}
-                                    className={`flex items-center justify-between px-4 py-3 ${i !== 0 ? "border-t border-border" : ""}`}
+                                    className={`flex items-center justify-between gap-3 px-4 py-3 ${i !== 0 ? "border-t border-border" : ""}`}
                                 >
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex min-w-0 items-center gap-3">
                                         <svg className="h-4 w-4 shrink-0 cursor-grab text-black active:cursor-grabbing" viewBox="0 0 16 16" fill="currentColor">
                                             <circle cx="5.5" cy="3.5" r="1.25" />
                                             <circle cx="10.5" cy="3.5" r="1.25" />
@@ -395,8 +395,8 @@ export default function ProductDetailPage() {
                                             <circle cx="5.5" cy="12.5" r="1.25" />
                                             <circle cx="10.5" cy="12.5" r="1.25" />
                                         </svg>
-                                        <div>
-                                            <span className="font-medium text-black">{group.name ?? "—"}</span>
+                                        <div className="min-w-0">
+                                            <span className="font-medium text-black break-words">{group.name ?? "—"}</span>
                                         </div>
                                     </div>
                                     {isAdmin && (
@@ -404,6 +404,7 @@ export default function ProductDetailPage() {
                                             variant="destructive"
                                             size="xs"
                                             onClick={() => openRemoveModifierGroup(group.docId ?? "")}
+                                            className="shrink-0"
                                         >
                                             Remove
                                         </Button>

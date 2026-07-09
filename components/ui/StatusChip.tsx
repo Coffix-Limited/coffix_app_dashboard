@@ -39,15 +39,21 @@ const enumMaps: Record<EnumDomain, Record<string, EnumEntry>> = {
     completed: { label: "Completed", color: "green"  },
     failed:    { label: "Failed",    color: "red"    },
     declined:  { label: "Declined",  color: "red"    },
+    claimed:   { label: "Claimed",   color: "green"  },
+    pending:   { label: "Pending",   color: "yellow" },
+    sent:      { label: "Sent",      color: "blue"   },
+    expired:   { label: "Expired",   color: "grey"   },
   },
   paymentMethod: {
     coffixCredit: { label: "Coffix Credit", color: "black" },
     card:         { label: "Credit Card",   color: "blue"  },
     wallet:       { label: "Wallet",        color: "blue"  },
+    cash:         { label: "Cash",          color: "green" },
   },
   transactionType: {
     order:  { label: "Order",  color: "blue"   },
     refund: { label: "Refund", color: "yellow" },
+    gift:   { label: "Gift",   color: "green"  },
   },
   storeStatus: {
     Open:     { label: "Open",     color: "green" },

@@ -14,6 +14,7 @@ import {
 } from "./constants/storeFieldConstants";
 import { escapeCSV, parseCSVText, triggerCSVDownload } from "@/app/utils/csvUtils";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { EnumChip } from "@/components/ui/StatusChip";
 import {
   Dialog,
@@ -507,14 +508,14 @@ export default function StoresPage() {
                     </td>
                     <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
                       {isAdmin ? (
-                        <Button
-                          size="xs"
-                          variant={isDisabled ? "solid-error" : "solid-success"}
-                          onClick={() => StoreService.updateStore(store.docId, { disable: !isDisabled })}
-                          className="rounded-full"
-                        >
-                          {isDisabled ? "Disabled" : "Enabled"}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={!isDisabled}
+                            onCheckedChange={(checked) =>
+                              StoreService.updateStore(store.docId, { disable: !checked })
+                            }
+                          />
+                        </div>
                       ) : (
                         <span className="text-sm text-light-grey">{isDisabled ? "Disabled" : "Enabled"}</span>
                       )}
