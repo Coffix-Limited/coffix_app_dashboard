@@ -84,8 +84,10 @@ export function signedCoffixAmount(tx: Transaction, userId: string): number {
  * not touch the coffix balance and is ignored here. Credit-adds use `totalAmount`
  * when available (which includes any topup bonus), falling back to `amount`;
  * spending is netted against `couponDiscount` (see signedCoffixAmount).
- * `gift` is exempt from the payment-method gate — it is an inherently
- * coffix-credit transfer handled separately in signedCoffixAmount.
+ * `topup` and `gift` are exempt from the payment-method gate — a top-up always
+ * credits the coffix balance regardless of how it was paid (card/cash), and
+ * `gift` is an inherent coffix-credit transfer handled separately in
+ * signedCoffixAmount.
  */
 export function accumulateCoffixCredit(
   transactions: Transaction[],
@@ -96,9 +98,15 @@ export function accumulateCoffixCredit(
     if (tx.customerId !== userId && tx.recipientCustomerId !== userId) continue;
     const type = tx.type ?? "";
     // coffix-credit adds AND spends only count when the money actually moved
-    // through coffix credit — a cash/card refund or topup must NOT change the
-    // accumulated coffix balance. (gift is handled separately and is exempt.)
-    if (COFFIX_CREDIT_SIGN[type] && tx.paymentMethod !== "coffixCredit") continue;
+    // through coffix credit — a cash/card refund must NOT change the accumulated
+    // coffix balance. topup and gift are exempt: a top-up always credits the
+    // coffix balance regardless of how it was paid, and gift is an inherent
+    // coffix transfer handled separately in signedCoffixAmount.
+    if (
+      type !== "topup" &&
+      COFFIX_CREDIT_SIGN[type] &&
+      tx.paymentMethod !== "coffixCredit"
+    ) continue;
     total += signedCoffixAmount(tx, userId);
   }
   return roundCents(total);
