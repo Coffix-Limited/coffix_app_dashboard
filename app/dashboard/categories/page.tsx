@@ -307,7 +307,8 @@ export default function CategoriesPage() {
                   onDragStart={() => { if (!anyFilterActive) dragIndex.current = i; }}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={() => { if (!anyFilterActive) handleDrop(i); }}
-                  className="transition-colors hover:bg-background"
+                  onClick={() => openEdit(c.docId ?? "", c.name ?? "")}
+                  className="cursor-pointer transition-colors hover:bg-background"
                 >
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
@@ -325,16 +326,10 @@ export default function CategoriesPage() {
                   <td className="px-5 py-3 text-right">
                     <div className="flex justify-end gap-1">
                       <Button
-                        variant="outline"
-                        size="xs"
-                        onClick={() => openEdit(c.docId ?? "", c.name ?? "")}
-                      >
-                        Edit
-                      </Button>
-                      <Button
                         variant="destructive"
                         size="xs"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setActiveCategoryId(c.docId ?? null);
                           setCategoryDialog("delete");
                         }}

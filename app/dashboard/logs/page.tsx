@@ -7,17 +7,43 @@ import { formatDateTime } from "@/app/utils/formatting";
 import { useUserStore } from "@/app/dashboard/users/store/useUserStore";
 import { escapeCSV, tsToISO, triggerCSVDownload } from "@/app/utils/csvUtils";
 import { Button } from "@/components/ui/button";
+import { LogsFilterBar } from "./components/LogsFilterBar";
+import { LogSettingsDialog } from "./components/LogSettingsDialog";
 
-const SEVERITY_STYLES: Record<string, string> = {
-  error: "bg-red-100 text-red-700",
-  warning: "bg-yellow-100 text-yellow-700",
-  info: "bg-blue-100 text-blue-700",
-  success: "bg-green-100 text-green-700",
+type DateRange = { from: string; to: string };
+
+function dateInRange(value: Date | undefined, from: string, to: string): boolean {
+  if (!from && !to) return true;
+  if (value === undefined || value === null) return false;
+  const d: Date =
+    typeof (value as unknown as { toDate?: () => Date }).toDate === "function"
+      ? (value as unknown as { toDate: () => Date }).toDate()
+      : (value as Date);
+  if (from && d < new Date(from)) return false;
+  if (to) {
+    const toEnd = new Date(to);
+    toEnd.setHours(23, 59, 59, 999);
+    if (d > toEnd) return false;
+  }
+  return true;
+}
+
+function uniqueValues(logs: Log[], selector: (log: Log) => string | undefined): string[] {
+  return Array.from(
+    new Set(logs.map(selector).filter((v): v is string => !!v && v.trim() !== ""))
+  ).sort();
+}
+
+const SEVERITY_STYLES: Record<number, string> = {
+  1: "bg-blue-100 text-blue-700",
+  3: "bg-yellow-100 text-yellow-700",
+  5: "bg-orange-100 text-orange-700",
+  9: "bg-red-100 text-red-700",
 };
 
-function SeverityBadge({ level }: { level?: string }) {
-  if (!level) return <span className="text-light-grey">—</span>;
-  const style = SEVERITY_STYLES[level.toLowerCase()] ?? "bg-gray-100 text-gray-500";
+function SeverityBadge({ level }: { level?: number }) {
+  if (level === undefined || level === null) return <span className="text-light-grey">—</span>;
+  const style = SEVERITY_STYLES[level] ?? "bg-gray-100 text-gray-500";
   return (
     <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${style}`}>
       {level}
@@ -33,19 +59,63 @@ function matches(log: Log, q: string, emailMap: Map<string | undefined, string |
 
 export default function LogsPage() {
   const logs = useLogStore((s) => s.logs);
+  const logSettings = useLogStore((s) => s.logSettings);
   const users = useUserStore((s) => s.users);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [filterCategory, setFilterCategory] = useState("All");
+  const [filterAction, setFilterAction] = useState("All");
+  const [filterSeverity, setFilterSeverity] = useState<number | "">("");
+  const [filterPage, setFilterPage] = useState("");
+  const [filterNotes, setFilterNotes] = useState("");
+  const [filterTime, setFilterTime] = useState<DateRange>({ from: "", to: "" });
 
   const userEmailMap = useMemo(
     () => new Map(users.map((u) => [u.docId, u.email])),
     [users]
   );
 
+  const uniqueCategories = useMemo(() => uniqueValues(logs, (l) => l.category), [logs]);
+  const uniqueActions = useMemo(() => uniqueValues(logs, (l) => l.action), [logs]);
+
+  const anyFilterActive = useMemo(
+    () =>
+      search.trim() !== "" ||
+      filterCategory !== "All" ||
+      filterAction !== "All" ||
+      filterSeverity !== "" ||
+      filterPage.trim() !== "" ||
+      filterNotes.trim() !== "" ||
+      filterTime.from !== "" ||
+      filterTime.to !== "",
+    [search, filterCategory, filterAction, filterSeverity, filterPage, filterNotes, filterTime]
+  );
+
+  function clearAllFilters() {
+    setSearch("");
+    setFilterCategory("All");
+    setFilterAction("All");
+    setFilterSeverity("");
+    setFilterPage("");
+    setFilterNotes("");
+    setFilterTime({ from: "", to: "" });
+  }
+
   const displayed = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return logs;
-    return logs.filter((log) => matches(log, q, userEmailMap));
-  }, [logs, search, userEmailMap]);
+    const page = filterPage.trim().toLowerCase();
+    const notes = filterNotes.trim().toLowerCase();
+    return logs.filter((log) => {
+      if (q && !matches(log, q, userEmailMap)) return false;
+      if (filterCategory !== "All" && log.category !== filterCategory) return false;
+      if (filterAction !== "All" && log.action !== filterAction) return false;
+      if (filterSeverity !== "" && log.severityLevel !== filterSeverity) return false;
+      if (page && !(log.page ?? "").toLowerCase().includes(page)) return false;
+      if (notes && !(log.notes ?? "").toLowerCase().includes(notes)) return false;
+      if (!dateInRange(log.time, filterTime.from, filterTime.to)) return false;
+      return true;
+    });
+  }, [logs, search, filterCategory, filterAction, filterSeverity, filterPage, filterNotes, filterTime, userEmailMap]);
 
   function exportToCSV() {
     const headers = ["docId", "time", "page", "category", "severityLevel", "action", "notes", "customerId", "userId"];
@@ -55,7 +125,7 @@ export default function LogsPage() {
         escapeCSV(tsToISO(log.time) || formatDateTime(log.time)),
         escapeCSV(log.page ?? ""),
         escapeCSV(log.category ?? ""),
-        escapeCSV(log.severityLevel ?? ""),
+        escapeCSV(String(log.severityLevel ?? "")),
         escapeCSV(log.action ?? ""),
         escapeCSV(log.notes ?? ""),
         escapeCSV(log.customerId ?? ""),
@@ -74,17 +144,34 @@ export default function LogsPage() {
             {logs.length} log{logs.length !== 1 ? "s" : ""} total
           </p>
         </div>
-        <Button variant="outline" onClick={exportToCSV} disabled={displayed.length === 0}>
-          Export CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setSettingsOpen(true)}>
+            Settings
+          </Button>
+          <Button variant="outline" onClick={exportToCSV} disabled={displayed.length === 0}>
+            Export CSV
+          </Button>
+        </div>
       </div>
 
-      <input
-        type="text"
-        placeholder="Search by action, category, page, notes…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm text-black outline-none placeholder:text-light-grey focus:border-primary sm:max-w-xs"
+      <LogSettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        settings={logSettings}
+      />
+
+      <LogsFilterBar
+        search={search} setSearch={setSearch}
+        filterCategory={filterCategory} setFilterCategory={setFilterCategory}
+        categories={uniqueCategories}
+        filterAction={filterAction} setFilterAction={setFilterAction}
+        actions={uniqueActions}
+        filterSeverity={filterSeverity} setFilterSeverity={setFilterSeverity}
+        filterPage={filterPage} setFilterPage={setFilterPage}
+        filterNotes={filterNotes} setFilterNotes={setFilterNotes}
+        filterTime={filterTime} setFilterTime={setFilterTime}
+        anyFilterActive={anyFilterActive}
+        clearAllFilters={clearAllFilters}
       />
 
       <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
@@ -109,7 +196,10 @@ export default function LogsPage() {
               </tr>
             ) : (
               displayed.map((log) => (
-                <tr key={log.docId} className="transition-colors hover:bg-background">
+                <tr
+                  key={log.docId}
+                  className="transition-colors hover:bg-background"
+                >
                   <td className="px-5 py-3 text-black">{log.customerId ? (userEmailMap.get(log.customerId) ?? "N/A") : "N/A"}</td>
                   <td className="px-5 py-3 text-black">{log.action ?? "—"}</td>
                   <td className="px-5 py-3 text-black">{log.category ?? "—"}</td>

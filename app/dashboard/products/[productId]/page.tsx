@@ -10,6 +10,8 @@ import { Product } from "../interface/product";
 import { ProductService } from "../service/ProductService";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { ImageUploadField } from "@/components/components/ImageUploadField";
 type DialogMode = "edit-product" | "delete-product" | "add-modifier" | "remove-modifier-group" | null;
 
 function MultiSelect({
@@ -37,9 +39,9 @@ function MultiSelect({
         <label className="text-xs text-black">{label}</label>
         {showSelectAll && options.length > 0 && (
           <div className="flex gap-2">
-            <button type="button" onClick={() => onChange(options.map((o) => o.value))} disabled={allSelected} className="text-xs text-primary hover:underline disabled:opacity-40">Select all</button>
+            <Button type="button" variant="link" size="xs" onClick={() => onChange(options.map((o) => o.value))} disabled={allSelected}>Select all</Button>
             <span className="text-xs text-black">·</span>
-            <button type="button" onClick={() => onChange([])} disabled={selected.length === 0} className="text-xs text-black hover:text-black hover:underline disabled:opacity-40">Unselect all</button>
+            <Button type="button" variant="ghost" size="xs" onClick={() => onChange([])} disabled={selected.length === 0}>Unselect all</Button>
           </div>
         )}
       </div>
@@ -69,6 +71,7 @@ export default function ProductDetailPage() {
 
     const products = useDashboardStore((s) => s.products);
     const modifierGroups = useDashboardStore((s) => s.modifierGroups);
+    const categories = useDashboardStore((s) => s.categories);
     const getCategoryName = useDashboardStore((s) => s.getCategoryName);
     const stores = useStoreStore((s) => s.stores);
 
@@ -232,50 +235,58 @@ export default function ProductDetailPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-start justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                    <button
+                    <Button
+                        variant="outline"
                         onClick={() => router.push("/dashboard/products")}
-                        className="mb-2 text-xs text-black hover:text-black"
+                        size="sm"
                     >
                         ← Back to Products
-                    </button>
-                    <h1 className="text-2xl font-semibold text-black">{product.name ?? "—"}</h1>
+                    </Button>
+                    <h1 className="text-xl font-semibold text-black sm:text-2xl">{product.name ?? "—"}</h1>
                     <p className="mt-1 text-sm text-black">{getCategoryName(product.categoryId)}</p>
                 </div>
-                <div className="flex gap-2">
-                    <button
-                        onClick={openEditProduct}
-                        className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-black transition-colors hover:border-primary hover:text-primary"
-                    >
-                        Edit
-                    </button>
-                    <button
-                        onClick={() => setDialog("delete-product")}
-                        className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
-                    >
-                        Delete
-                    </button>
-                </div>
+                {isAdmin && (
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={openEditProduct}
+                        >
+                            Edit
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => setDialog("delete-product")}
+                        >
+                            Delete
+                        </Button>
+                    </div>
+                )}
             </div>
+
+            {/* Product image — square to match 1200×1200 mobile app asset */}
+            {product.imageUrl ? (
+                <div className="relative h-48 w-48 overflow-hidden rounded-xl">
+                    <Image
+                        src={product.imageUrl}
+                        alt={product.name ?? "Product"}
+                        fill
+                        sizes="192px"
+                        className="object-cover"
+                    />
+                </div>
+            ) : (
+                <div className="flex h-48 w-48 items-center justify-center rounded-xl bg-primary text-4xl font-bold text-white">
+                    {(product.name ?? "?")[0].toUpperCase()}
+                </div>
+            )}
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                 {/* Left column: product info + status controls */}
                 <div className="lg:col-span-1 space-y-4">
                     <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
-                        {product.imageUrl ? (
-                            <Image
-                                src={product.imageUrl}
-                                alt={product.name ?? "Product"}
-                                width={400}
-                                height={240}
-                                className="h-48 w-full object-cover"
-                            />
-                        ) : (
-                            <div className="flex h-48 items-center justify-center bg-primary text-4xl font-bold text-white">
-                                {(product.name ?? "?")[0].toUpperCase()}
-                            </div>
-                        )}
+                      
                         <div className="divide-y divide-border p-0">
                             {[
                                 { label: "Category", value: getCategoryName(product.categoryId) },
@@ -294,22 +305,22 @@ export default function ProductDetailPage() {
 
                     {/* ── Status Controls ── */}
                     <div className="rounded-xl border border-border bg-white p-4 shadow-(--shadow) space-y-4">
-                        <p className="text-xs font-bold uppercase tracking-wide text-black">Availability</p>
+                        <p className="text-xs font-bold uppercase tracking-wide text-black">Temporary Availability (Enabled by Midnight)</p>
 
                         {/* Product disable — admin only */}
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center justify-between gap-3">
                             <div>
                                 <p className="text-sm font-medium text-black">Product Availability</p>
                             </div>
                             {isAdmin ? (
-                                <Button
-                                    size="xs"
-                                    variant={isAllDisabled ? "solid-success" : "solid-error"}
-                                    onClick={handleToggleAllStores}
-                                    disabled={statusLoading}
-                                >
-                                    {isAllDisabled ? "Click to enable for All Stores" : "Click to disable for All Stores"}
-                                </Button>
+                                <div className="flex shrink-0 items-center gap-2">
+                                    <Switch
+                                        checked={!isAllDisabled}
+                                        onCheckedChange={handleToggleAllStores}
+                                        disabled={statusLoading}
+                                        aria-label="Toggle availability for all stores"
+                                    />
+                                </div>
                             ) : (
                                 <span className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
                                     isAllDisabled
@@ -329,20 +340,19 @@ export default function ProductDetailPage() {
                                     {assignedStoreIds.map((storeId) => {
                                         const store = stores.find((s) => s.docId === storeId);
                                         const isDisabled = disabledStores.includes(storeId);
-                                        return (
-                                            <div key={storeId} className="flex items-center justify-between px-3 py-2.5">
-                                                <span className="text-sm text-black">{store?.name ?? storeId}</span>
-                                                <Button
-                                                    size="xs"
-                                                    variant={isDisabled ? "solid-error" : "solid-success"}
-                                                    onClick={() => handleToggleStoreDisable(storeId)}
-                                                    disabled={statusLoading}
-                                                    className="rounded-full"
-                                                >
-                                                    {isDisabled ? "Click to enable for this Store" : "Click to disable for this Store"}
-                                                </Button>
+                                        return store ? (
+                                            <div key={storeId} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                                                <span className="min-w-0 break-words text-sm text-black">{store?.name ?? storeId}</span>
+                                                <div className="flex shrink-0 items-center gap-2">
+                                                    <Switch
+                                                        checked={!isDisabled}
+                                                        onCheckedChange={() => handleToggleStoreDisable(storeId)}
+                                                        disabled={statusLoading}
+                                                        aria-label={`Toggle availability for ${store?.name ?? storeId}`}
+                                                    />
+                                                </div>
                                             </div>
-                                        );
+                                        ) : null;
                                     })}
                                 </div>
                             </div>
@@ -352,14 +362,13 @@ export default function ProductDetailPage() {
 
                 {/* Right column: modifier groups */}
                 <div className="lg:col-span-2 space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                         <h2 className="font-semibold text-black">Modifier Groups</h2>
-                        <button
-                            onClick={openAddModifier}
-                            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-80"
-                        >
-                            + Add Modifier Group
-                        </button>
+                        {isAdmin && (
+                            <Button onClick={openAddModifier} size="sm">
+                                + Add Modifier Group
+                            </Button>
+                        )}
                     </div>
 
                     {productModifierGroups.length === 0 ? (
@@ -371,13 +380,13 @@ export default function ProductDetailPage() {
                             {productModifierGroups.map((group, i) => (
                                 <div
                                     key={group.docId}
-                                    draggable
-                                    onDragStart={() => { dragIndex.current = i; }}
+                                    draggable={isAdmin}
+                                    onDragStart={() => { if (isAdmin) dragIndex.current = i; }}
                                     onDragOver={(e) => e.preventDefault()}
-                                    onDrop={() => handleDrop(i)}
-                                    className={`flex items-center justify-between px-4 py-3 ${i !== 0 ? "border-t border-border" : ""}`}
+                                    onDrop={() => { if (isAdmin) handleDrop(i); }}
+                                    className={`flex items-center justify-between gap-3 px-4 py-3 ${i !== 0 ? "border-t border-border" : ""}`}
                                 >
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex min-w-0 items-center gap-3">
                                         <svg className="h-4 w-4 shrink-0 cursor-grab text-black active:cursor-grabbing" viewBox="0 0 16 16" fill="currentColor">
                                             <circle cx="5.5" cy="3.5" r="1.25" />
                                             <circle cx="10.5" cy="3.5" r="1.25" />
@@ -386,16 +395,20 @@ export default function ProductDetailPage() {
                                             <circle cx="5.5" cy="12.5" r="1.25" />
                                             <circle cx="10.5" cy="12.5" r="1.25" />
                                         </svg>
-                                        <div>
-                                            <span className="font-medium text-black">{group.name ?? "—"}</span>
+                                        <div className="min-w-0">
+                                            <span className="font-medium text-black break-words">{group.name ?? "—"}</span>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => openRemoveModifierGroup(group.docId ?? "")}
-                                        className="text-xs text-error hover:opacity-70"
-                                    >
-                                        Remove
-                                    </button>
+                                    {isAdmin && (
+                                        <Button
+                                            variant="destructive"
+                                            size="xs"
+                                            onClick={() => openRemoveModifierGroup(group.docId ?? "")}
+                                            className="shrink-0"
+                                        >
+                                            Remove
+                                        </Button>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -410,7 +423,7 @@ export default function ProductDetailPage() {
                     onClick={() => setDialog(null)}
                 >
                     <div
-                        className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+                        className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Edit Product */}
@@ -418,16 +431,32 @@ export default function ProductDetailPage() {
                             <>
                                 <h3 className="mb-4 text-lg font-semibold text-black">Edit Product</h3>
                                 <div className="space-y-3">
-                                    {(["name", "imageUrl"] as const).map((field) => (
-                                        <div key={field}>
-                                            <label className="mb-1 block text-xs text-black capitalize">{field}</label>
-                                            <input
-                                                className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
-                                                value={(productForm[field] as string) ?? ""}
-                                                onChange={(e) => setProductForm((f) => ({ ...f, [field]: e.target.value }))}
-                                            />
-                                        </div>
-                                    ))}
+                                    <div>
+                                        <label className="mb-1 block text-xs text-black capitalize">name</label>
+                                        <input
+                                            className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
+                                            value={(productForm.name as string) ?? ""}
+                                            onChange={(e) => setProductForm((f) => ({ ...f, name: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="mb-1 block text-xs text-black capitalize">Category</label>
+                                        <select
+                                            className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
+                                            value={productForm.categoryId ?? ""}
+                                            onChange={(e) => setProductForm((f) => ({ ...f, categoryId: e.target.value }))}
+                                        >
+                                            <option value="">— Select category —</option>
+                                            {categories.map((c) => (
+                                                <option key={c.docId} value={c.docId}>{c.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <ImageUploadField
+                                        value={(productForm.imageUrl as string) ?? ""}
+                                        onChange={(url) => setProductForm((f) => ({ ...f, imageUrl: url }))}
+                                        disabled={loading}
+                                    />
                                     <div>
                                         <label className="mb-1 block text-xs text-black capitalize">Price</label>
                                         <div className="relative">
@@ -475,12 +504,18 @@ export default function ProductDetailPage() {
                                         onChange={(v) => setProductForm((f) => ({ ...f, availableToStores: v }))}
                                         showSelectAll
                                     />
+                                    <MultiSelect
+                                        label="Modifier Groups (optional)"
+                                        options={modifierGroups.map((g) => ({ value: g.docId ?? "", label: g.name ?? g.docId ?? "" }))}
+                                        selected={productForm.modifierGroupIds ?? []}
+                                        onChange={(v) => setProductForm((f) => ({ ...f, modifierGroupIds: v }))}
+                                    />
                                 </div>
                                 <div className="mt-5 flex justify-end gap-2">
-                                    <button onClick={() => setDialog(null)} className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]">Cancel</button>
-                                    <button onClick={handleUpdateProduct} disabled={loading} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50">
+                                    <Button onClick={() => setDialog(null)} variant="outline">Cancel</Button>
+                                    <Button onClick={handleUpdateProduct} disabled={loading} >
                                         {loading ? "Saving…" : "Save"}
-                                    </button>
+                                    </Button>
                                 </div>
                             </>
                         )}
@@ -493,10 +528,10 @@ export default function ProductDetailPage() {
                                     Are you sure you want to delete <strong className="text-black">{product.name}</strong>? This cannot be undone.
                                 </p>
                                 <div className="mt-5 flex justify-end gap-2">
-                                    <button onClick={() => setDialog(null)} className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]">Cancel</button>
-                                    <button onClick={handleDeleteProduct} disabled={loading} className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50">
+                                    <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
+                                    <Button variant="solid-error" onClick={handleDeleteProduct} disabled={loading}>
                                         {loading ? "Deleting…" : "Delete"}
-                                    </button>
+                                    </Button>
                                 </div>
                             </>
                         )}
@@ -523,10 +558,10 @@ export default function ProductDetailPage() {
                                     </div>
                                 </div>
                                 <div className="mt-5 flex justify-end gap-2">
-                                    <button onClick={() => setDialog(null)} className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]">Cancel</button>
-                                    <button onClick={handleAddModifierGroup} disabled={loading || !selectedGroupId} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50">
+                                    <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
+                                    <Button onClick={handleAddModifierGroup} disabled={loading || !selectedGroupId}>
                                         {loading ? "Saving…" : "Add"}
-                                    </button>
+                                    </Button>
                                 </div>
                             </>
                         )}
@@ -538,10 +573,10 @@ export default function ProductDetailPage() {
                                 <h3 className="mb-2 text-lg font-semibold text-black">Remove Modifier Group</h3>
                                 <p className="text-sm text-black">Remove this modifier group from the product? The group itself will not be deleted.</p>
                                 <div className="mt-5 flex justify-end gap-2">
-                                    <button onClick={() => setDialog(null)} className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]">Cancel</button>
-                                    <button onClick={handleRemoveModifierGroup} disabled={loading} className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50">
+                                    <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
+                                    <Button variant="solid-error" onClick={handleRemoveModifierGroup} disabled={loading}>
                                         {loading ? "Removing…" : "Remove"}
-                                    </button>
+                                    </Button>
                                 </div>
                             </>
                         )}

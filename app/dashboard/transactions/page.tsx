@@ -12,6 +12,8 @@ import { useAuth } from "@/app/lib/AuthContext";
 import { toast } from "sonner";
 import { TransactionService } from "./service/TransactionService";
 import { TransactionsFilterBar } from "./components/TransactionsFilterBar";
+import { AddTransactionDialog } from "./components/AddTransactionDialog";
+import { EnumChip } from "@/components/ui/StatusChip";
 
 type DateRange = { from: string; to: string };
 type NumberRange = { min: string; max: string };
@@ -32,25 +34,6 @@ function dateInRange(value: Date | undefined, from: string, to: string): boolean
   return true;
 }
 
-function PaymentMethodBadge({ method }: { method: PaymentMethod | null | undefined }) {
-  if (!method) return <span className="text-black">—</span>;
-  const styles: Record<PaymentMethod, string> = {
-    coffixCredit: "bg-primary text-white",
-    card: "bg-black text-white",
-    wallet: "border border-border text-black",
-  };
-  const labels: Record<PaymentMethod, string> = {
-    coffixCredit: "Coffix Credit",
-    card: "Credit Card",
-    wallet: "Wallet",
-  };
-  return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${styles[method]}`}>
-      {labels[method]}
-    </span>
-  );
-}
-
 type SortKey = "createdAt" | "transactionNumber";
 type SortDir = "asc" | "desc";
 
@@ -67,9 +50,10 @@ export default function TransactionsPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [invoicing, setInvoicing] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
-  const [filterStatus, setFilterStatus] = useState("All");
+  const [filterStatus, setFilterStatus] = useState<Set<string>>(new Set());
   const [filterCreatedAt, setFilterCreatedAt] = useState<DateRange>({ from: "", to: "" });
   const [filterAmount, setFilterAmount] = useState<NumberRange>({ min: "", max: "" });
   const [filterTotalAmount, setFilterTotalAmount] = useState<NumberRange>({ min: "", max: "" });
@@ -86,7 +70,7 @@ export default function TransactionsPage() {
       search.trim() !== "" ||
       typeFilter !== "All" ||
       methodFilter !== "All" ||
-      filterStatus !== "All" ||
+      filterStatus.size > 0 ||
       filterCreatedAt.from !== "" || filterCreatedAt.to !== "" ||
       filterAmount.min !== "" || filterAmount.max !== "" ||
       filterTotalAmount.min !== "" || filterTotalAmount.max !== "" ||
@@ -100,7 +84,7 @@ export default function TransactionsPage() {
     setSearch("");
     setTypeFilter("All");
     setMethodFilter("All");
-    setFilterStatus("All");
+    setFilterStatus(new Set());
     setFilterCreatedAt({ from: "", to: "" });
     setFilterAmount({ min: "", max: "" });
     setFilterTotalAmount({ min: "", max: "" });
@@ -173,6 +157,14 @@ export default function TransactionsPage() {
     return Array.from(types).sort();
   }, [transactions]);
 
+  const refundedTxNums = useMemo(() => {
+    return new Set(
+      transactions
+        .filter((t) => t.type === "refund" && t.originalTransactionNumber)
+        .map((t) => t.originalTransactionNumber!)
+    );
+  }, [transactions]);
+
   const displayed = useMemo(() => {
     const q = search.trim().toLowerCase();
     let result = transactions.filter((tx) => {
@@ -183,7 +175,7 @@ export default function TransactionsPage() {
         const num = (tx.transactionNumber ?? "").toLowerCase();
         if (!email.includes(q) && !num.includes(q)) return false;
       }
-      if (filterStatus !== "All" && tx.status !== filterStatus) return false;
+      if (filterStatus.size > 0 && !filterStatus.has(tx.status ?? "")) return false;
       if (!dateInRange(tx.createdAt ?? undefined, filterCreatedAt.from, filterCreatedAt.to)) return false;
       if (filterAmount.min !== "") {
         const min = parseFloat(filterAmount.min);
@@ -236,6 +228,7 @@ export default function TransactionsPage() {
       coffixCredit: "Coffix Credit",
       card: "Credit Card",
       wallet: "Wallet",
+      cash: "Cash",
     };
     const headers = ["transactionNumber", "createdAt", "paymentMethod", "type", "customerId", "amount", "status", "orderId", "gst", "gstAmount", "totalAmount", "recipientEmail"];
     const rows = displayed.map((tx) =>
@@ -275,6 +268,7 @@ export default function TransactionsPage() {
           <Button variant="outline" onClick={exportToCSV} disabled={displayed.length === 0}>
             Export CSV
           </Button>
+          <Button onClick={() => setAddOpen(true)}>Add Transaction</Button>
         </div>
       </div>
 
@@ -322,13 +316,15 @@ export default function TransactionsPage() {
                 Payment Method
               </th>
               <th className="px-5 py-3 text-left font-medium text-light-grey">Type</th>
+              <th className="px-5 py-3 text-left font-medium text-light-grey">Amount</th>
+              <th className="px-5 py-3 text-left font-medium text-light-grey">Status</th>
               <th className="px-5 py-3 text-left font-medium text-light-grey">Customer</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {displayed.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-light-grey">
+                <td colSpan={8} className="px-5 py-10 text-center text-light-grey">
                   No transactions found.
                 </td>
               </tr>
@@ -348,13 +344,23 @@ export default function TransactionsPage() {
                     />
                   </td>
                   <td className="px-5 py-3 font-mono text-black">
-                    {tx.transactionNumber ?? "—"}
+                    <div className="flex items-center gap-2">
+                      {tx.transactionNumber ?? "—"}
+                    </div>
                   </td>
                   <td className="px-5 py-3 text-black">{formatDateTime(tx.createdAt)}</td>
                   <td className="px-5 py-3">
-                    <PaymentMethodBadge method={tx.paymentMethod} />
+                    <EnumChip domain="paymentMethod" value={tx.paymentMethod} />
                   </td>
-                  <td className="px-5 py-3 text-black">{tx.type ?? "—"}</td>
+                  <td className="px-5 py-3">
+                    <EnumChip domain="transactionType" value={tx.type} />
+                  </td>
+                  <td className="px-5 py-3 text-black">
+                    {tx.amount != null ? `$${tx.amount.toFixed(2)}` : "—"}
+                  </td>
+                  <td className="px-5 py-3">
+                    <EnumChip domain="transactionStatus" value={tx.status} />
+                  </td>
                   <td className="px-5 py-3 text-black">{getCustomerEmail(tx)}</td>
                 </tr>
               ))
@@ -362,6 +368,8 @@ export default function TransactionsPage() {
           </tbody>
         </table>
       </div>
+
+      <AddTransactionDialog open={addOpen} onClose={() => setAddOpen(false)} />
     </div>
   );
 }

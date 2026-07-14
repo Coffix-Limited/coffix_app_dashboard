@@ -189,21 +189,13 @@ function StaffDialog({
                 <label className="text-xs text-light-grey">Assigned Stores *</label>
                 {stores.length > 0 && (
                   <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={onSelectAll}
-                      className="text-xs text-primary hover:underline"
-                    >
+                    <Button type="button" variant="link" size="xs" onClick={onSelectAll}>
                       Select all
-                    </button>
+                    </Button>
                     <span className="text-xs text-light-grey">·</span>
-                    <button
-                      type="button"
-                      onClick={onUnselectAll}
-                      className="text-xs text-light-grey hover:underline"
-                    >
+                    <Button type="button" variant="ghost" size="xs" onClick={onUnselectAll}>
                       Unselect all
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -258,17 +250,10 @@ function StaffDialog({
         </div>
 
         <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]"
-          >
+          <Button variant="outline" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            onClick={onSubmit}
-            disabled={loading}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50"
-          >
+          </Button>
+          <Button onClick={onSubmit} disabled={loading}>
             {loading
               ? isEdit
                 ? "Saving…"
@@ -276,7 +261,7 @@ function StaffDialog({
               : isEdit
                 ? "Save Changes"
                 : "Create Staff"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -549,11 +534,11 @@ export default function StaffsPage() {
         storeIds: editForm.storeIds,
         disabled: editForm.disabled,
       });
-      toast.success("Staff member updated.");
+      toast.success("User updated.");
       closeEdit();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to update staff. Please try again.");
+      toast.error("Failed to update user. Please try again.");
     } finally {
       setEditLoading(false);
     }
@@ -564,10 +549,10 @@ export default function StaffsPage() {
     if (!window.confirm(`Delete ${staff.email}? This cannot be undone.`)) return;
     try {
       await StaffService.deleteStaff(staff.docId);
-      toast.success("Staff member deleted.");
+      toast.success("User deleted.");
     } catch (err) {
       console.error(err);
-      toast.error("Failed to delete staff.");
+      toast.error("Failed to delete user.");
     }
   }
 
@@ -584,9 +569,9 @@ export default function StaffsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-black">Staff</h1>
+          <h1 className="text-2xl font-semibold text-black">Users</h1>
           <p className="mt-1 text-sm text-light-grey">
-            {staffs.length} staff member{staffs.length !== 1 ? "s" : ""} total
+            {staffs.length} user{staffs.length !== 1 ? "s" : ""} total
           </p>
         </div>
         <div className="flex gap-2">
@@ -607,11 +592,8 @@ export default function StaffsPage() {
           </Button> */}
           <div className="flex gap-2">
           <Button variant="outline"  onClick={exportToCSV}>Export CSV</Button>
-          <Button
-              onClick={openCreate}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
-            >
-              + New Staff
+          <Button onClick={openCreate}>
+              + New User
             </Button>
         </div>
         </div>
@@ -657,7 +639,7 @@ export default function StaffsPage() {
             {displayed.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-5 py-10 text-center text-light-grey">
-                  No staff members found.
+                  No users found.
                 </td>
               </tr>
             ) : (
@@ -700,12 +682,13 @@ export default function StaffsPage() {
 
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-end gap-2">
-                      <button
+                      <Button
+                        variant="destructive"
+                        size="sm"
                         onClick={(e) => { e.stopPropagation(); handleDelete(staff); }}
-                        className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-error transition-colors hover:border-error hover:bg-red-50"
                       >
                         Delete
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -718,7 +701,7 @@ export default function StaffsPage() {
       {/* Create Dialog */}
       {showCreate && (
         <StaffDialog
-          title="New Staff"
+          title="New User"
           form={createForm}
           errors={createErrors}
           loading={createLoading}
@@ -754,7 +737,7 @@ export default function StaffsPage() {
       {/* Edit Dialog */}
       {editTarget && (
         <StaffDialog
-          title="Edit Staff"
+          title="Edit User"
           form={editForm}
           errors={editErrors}
           loading={editLoading}
@@ -793,7 +776,7 @@ export default function StaffsPage() {
       <Dialog open={showImportInfo} onOpenChange={setShowImportInfo}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>CSV Import Guide — Staff</DialogTitle>
+            <DialogTitle>CSV Import Guide — Users</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2 text-sm">
             <div className="space-y-1.5">

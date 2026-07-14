@@ -33,9 +33,11 @@ type FormState = {
   minCreditToShare: string;
   minTopUp: string;
   referralExpiryDays: string;
+  aboutUrl: string;
   specialUrl: string;
   storeUrl: string;
   tcUrl: string;
+  topupLevel1: string;
   topupLevel2: string;
   topupLevel3: string;
   withdrawalFee: string;
@@ -55,9 +57,11 @@ function settingsToForm(s: GlobalSettings): FormState {
     minCreditToShare: s.minCreditToShare?.toString() ?? "",
     minTopUp: s.minTopUp?.toString() ?? "",
     referralExpiryDays: s.referralExpiryDays?.toString() ?? "",
+    aboutUrl: s.aboutUrl ?? "",
     specialUrl: s.specialUrl ?? "",
     storeUrl: s.storeUrl ?? "",
     tcUrl: s.tcUrl ?? "",
+    topupLevel1: s.topupLevel1?.toString() ?? "",
     topupLevel2: s.topupLevel2?.toString() ?? "",
     topupLevel3: s.topupLevel3?.toString() ?? "",
     withdrawalFee: s.withdrawalFee?.toString() ?? "",
@@ -70,13 +74,14 @@ const NUMERIC_NON_NEGATIVE: (keyof FormState)[] = [
   "discountLevel2",
   "discountLevel3",
   "maxDayBetweenLogin",
+  "topupLevel1",
   "topupLevel2",
   "topupLevel3",
   "withdrawalFee",
 ];
 const NUMERIC_INTEGER: (keyof FormState)[] = ["creditExpiryDuration", "referralExpiryDays", "couponExpiryDays"];
 const NUMERIC_POSITIVE: (keyof FormState)[] = ["minCreditToShare", "minTopUp", "couponDefaultAmount"];
-const URL_FIELDS: (keyof FormState)[] = ["specialUrl", "storeUrl", "tcUrl"];
+const URL_FIELDS: (keyof FormState)[] = ["aboutUrl", "specialUrl", "storeUrl", "tcUrl"];
 
 const FIELD_LABELS: Record<keyof FormState, string> = {
   GST: "GST",
@@ -91,9 +96,11 @@ const FIELD_LABELS: Record<keyof FormState, string> = {
   minCreditToShare: "Min Credit to Share",
   minTopUp: "Min Top Up",
   referralExpiryDays: "Referral Expiry Days",
+  aboutUrl: "About URL",
   specialUrl: "Special URL",
   storeUrl: "Store URL",
   tcUrl: "T&C URL",
+  topupLevel1: "Top Up Level 1",
   topupLevel2: "Top Up Level 2",
   topupLevel3: "Top Up Level 3",
   withdrawalFee: "Withdrawal Fee",
@@ -297,33 +304,73 @@ const emptyForm: FormState = {
   minCreditToShare: "",
   minTopUp: "",
   referralExpiryDays: "",
+  aboutUrl: "",
   specialUrl: "",
   storeUrl: "",
   tcUrl: "",
+  topupLevel1: "",
   topupLevel2: "",
   topupLevel3: "",
   withdrawalFee: "",
 };
 
+type FlagsState = {
+  defScheduleOrder: boolean;
+  defShareCredit: boolean;
+  defWithdrawBalance: boolean;
+  defCoffixCreditAvailable: boolean;
+  defGetPurchaseInfoByMail: boolean;
+  defGetPromotions: boolean;
+  defAllowWinACoffee: boolean;
+  defAllowCoffeeForHome: boolean;
+  defAllowNotifications: boolean;
+};
+
+const emptyFlags: FlagsState = {
+  defScheduleOrder: false,
+  defShareCredit: false,
+  defWithdrawBalance: false,
+  defCoffixCreditAvailable: false,
+  defGetPurchaseInfoByMail: false,
+  defGetPromotions: false,
+  defAllowWinACoffee: false,
+  defAllowCoffeeForHome: false,
+  defAllowNotifications: false,
+};
+
+const FLAG_META: { key: keyof FlagsState; label: string; description: string }[] = [
+  { key: "defScheduleOrder", label: "Schedule Order", description: "Allow users to schedule orders by default" },
+  { key: "defShareCredit", label: "Share Credit", description: "Allow users to share credits by default" },
+  { key: "defWithdrawBalance", label: "Withdraw Balance", description: "Allow users to withdraw balance by default" },
+  { key: "defCoffixCreditAvailable", label: "Coffix Credit Available", description: "Enable Coffix credit for new users by default" },
+  { key: "defGetPurchaseInfoByMail", label: "Get Purchase Info by Mail", description: "Send purchase receipts by email by default" },
+  { key: "defGetPromotions", label: "Get Promotions", description: "Subscribe to promotions by default" },
+  { key: "defAllowWinACoffee", label: "Allow Win a Coffee", description: "Enable \"Win a Coffee\" feature by default" },
+  { key: "defAllowCoffeeForHome", label: "Allow Coffee for Home", description: "Enable \"Coffee for Home\" feature by default" },
+  { key: "defAllowNotifications", label: "Allow Notifications", description: "Enable push notifications for new users by default" },
+];
+
 export default function GlobalSettingsPage() {
   const settings = useGlobalSettingsStore((s) => s.settings);
 
   const [form, setForm] = useState<FormState>(emptyForm);
-  const [toggles, setToggles] = useState({
-    scheduleOrder: false,
-    shareCredit: false,
-    withdrawBalance: false,
-  });
+  const [flags, setFlags] = useState<FlagsState>(emptyFlags);
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   useEffect(() => {
     if (settings) {
       setForm(settingsToForm(settings));
-      setToggles({
-        scheduleOrder: settings.scheduleOrder ?? false,
-        shareCredit: settings.shareCredit ?? false,
-        withdrawBalance: settings.withdrawBalance ?? false,
+      setFlags({
+        defScheduleOrder: settings.defScheduleOrder ?? false,
+        defShareCredit: settings.defShareCredit ?? false,
+        defWithdrawBalance: settings.defWithdrawBalance ?? false,
+        defCoffixCreditAvailable: settings.defCoffixCreditAvailable ?? false,
+        defGetPurchaseInfoByMail: settings.defGetPurchaseInfoByMail ?? false,
+        defGetPromotions: settings.defGetPromotions ?? false,
+        defAllowWinACoffee: settings.defAllowWinACoffee ?? false,
+        defAllowCoffeeForHome: settings.defAllowCoffeeForHome ?? false,
+        defAllowNotifications: settings.defAllowNotifications ?? false,
       });
     }
   }, [settings]);
@@ -332,16 +379,8 @@ export default function GlobalSettingsPage() {
     return (v: string) => setForm((f) => ({ ...f, [field]: v }));
   }
 
-  async function handleToggle(field: keyof typeof toggles, value: boolean) {
-    setToggles((t) => ({ ...t, [field]: value }));
-    try {
-      await GlobalSettingsService.updateSettings({ [field]: value });
-      toast.success("Setting updated.");
-    } catch (err) {
-      console.error(err);
-      setToggles((t) => ({ ...t, [field]: !value }));
-      toast.error("Failed to update setting.");
-    }
+  function setFlag(key: keyof FlagsState) {
+    return (v: boolean) => setFlags((f) => ({ ...f, [key]: v }));
   }
 
   async function handleSave() {
@@ -353,7 +392,7 @@ export default function GlobalSettingsPage() {
 
     setLoading(true);
     try {
-      await GlobalSettingsService.updateSettings({ ...formToPayload(form), ...toggles });
+      await GlobalSettingsService.updateSettings({ ...formToPayload(form), ...flags });
       toast.success("Settings saved.");
     } catch (err) {
       console.error(err);
@@ -432,10 +471,19 @@ export default function GlobalSettingsPage() {
 
         <Section title="Coffix Credit TopUp Amount">
           <Field
-            label="Top Up Level 1"
+            label="Min Top Up"
             type="number"
             value={form.minTopUp}
             onChange={setField("minTopUp")}
+            placeholder="0.00"
+            prefix="$"
+            money
+          />
+          <Field
+            label="Top Up Level 1"
+            type="number"
+            value={form.topupLevel1}
+            onChange={setField("topupLevel1")}
             placeholder="0.00"
             prefix="$"
             money
@@ -533,7 +581,26 @@ export default function GlobalSettingsPage() {
           />
         </Section>
 
+        <Section title="Default User Flags">
+          {FLAG_META.map(({ key, label, description }) => (
+            <ToggleField
+              key={key}
+              label={label}
+              description={description}
+              checked={flags[key]}
+              onChange={setFlag(key)}
+            />
+          ))}
+        </Section>
+
         <Section title="URLs">
+          <Field
+            label="About URL"
+            type="text"
+            value={form.aboutUrl}
+            onChange={setField("aboutUrl")}
+            placeholder="https://..."
+          />
           <Field
             label="Special URL"
             type="text"
@@ -557,26 +624,6 @@ export default function GlobalSettingsPage() {
           />
         </Section>
 
-        <Section title="Feature Flags">
-          <ToggleField
-            label="Schedule Order"
-            description="Allow customers to place orders for a future time"
-            checked={toggles.scheduleOrder}
-            onChange={(v) => handleToggle("scheduleOrder", v)}
-          />
-          <ToggleField
-            label="Share Credit"
-            description="Allow customers to gift Coffix Credit to others"
-            checked={toggles.shareCredit}
-            onChange={(v) => handleToggle("shareCredit", v)}
-          />
-          <ToggleField
-            label="Withdraw Balance"
-            description="Allow customers to withdraw their Coffix Credit balance"
-            checked={toggles.withdrawBalance}
-            onChange={(v) => handleToggle("withdrawBalance", v)}
-          />
-        </Section>
       </div>
 
       {/* Validation error dialog */}
@@ -586,7 +633,7 @@ export default function GlobalSettingsPage() {
           if (!open) setValidationErrors([]);
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Fix validation errors</DialogTitle>
             <DialogDescription>

@@ -119,17 +119,18 @@ export default function ImportPage() {
 
       {/* Collection selector */}
       <div className="space-y-2">
-        <label className="text-sm font-medium">Collection</label>
         <div className="flex flex-wrap gap-2">
           {COLLECTIONS.map((col) => (
-            <button
+            <Button
               key={col}
+              variant="outline"
+              size="sm"
               onClick={() => handleCollectionChange(col)}
               data-active={collection === col}
               className="px-3 py-1.5 text-sm rounded-lg border border-border transition-colors data-[active=true]:bg-primary data-[active=true]:text-white data-[active=true]:border-primary hover:bg-soft-grey hover:text-white"
             >
               {COLLECTION_LABELS[col]}
-            </button>
+            </Button>
           ))}
         </div>
       </div>

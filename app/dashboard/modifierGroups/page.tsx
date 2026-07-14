@@ -24,6 +24,7 @@ const emptyForm: NewGroupForm = {
 export default function ModifierGroupsPage() {
     const modifierGroups = useDashboardStore((s) => s.modifierGroups);
     const modifiers = useDashboardStore((s) => s.modifiers);
+    const products = useDashboardStore((s) => s.products);
 
     const router = useRouter();
     const [search, setSearch] = useState("");
@@ -75,6 +76,12 @@ export default function ModifierGroupsPage() {
     const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
 
+    const deleteTargetGroup = modifierGroups.find((g) => g.docId === deleteTargetId);
+    const productsUsingGroup = useMemo(
+        () => products.filter((p) => p.modifierGroupIds?.includes(deleteTargetId ?? "")),
+        [products, deleteTargetId],
+    );
+
     function setField<K extends keyof NewGroupForm>(key: K, value: NewGroupForm[K]) {
         setForm((f) => ({ ...f, [key]: value }));
         setErrors((e) => ({ ...e, [key]: false }));
@@ -116,8 +123,12 @@ export default function ModifierGroupsPage() {
         if (!deleteTargetId) return;
         setDeleteLoading(true);
         try {
-            await ProductService.deleteModifierGroup(deleteTargetId);
-            toast.success("Modifier group deleted.");
+            await ProductService.deleteModifierGroupCascade(
+                deleteTargetId,
+                deleteTargetGroup?.modifierIds ?? [],
+                productsUsingGroup.map((p) => p.docId).filter((id): id is string => !!id),
+            );
+            toast.success("Modifier group and its modifiers deleted.");
             setDeleteTargetId(null);
         } catch (err) {
             console.error(err);
@@ -147,10 +158,7 @@ export default function ModifierGroupsPage() {
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={exportToCSV}>Export CSV</Button>
-                    <Button
-                        onClick={() => setShowCreate(true)}
-                        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
-                    >
+                    <Button onClick={() => setShowCreate(true)}>
                         + New Group
                     </Button>
                 </div>
@@ -217,12 +225,13 @@ export default function ModifierGroupsPage() {
                                         </td>
                                         <td className="px-5 py-3 text-light-grey">{modifierCount}</td>
                                         <td className="px-5 py-3 text-right">
-                                            <button
+                                            <Button
+                                                variant="destructive"
+                                                size="sm"
                                                 onClick={(e) => { e.stopPropagation(); setDeleteTargetId(group.docId ?? null); }}
-                                                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-error transition-colors hover:border-error hover:text-error"
                                             >
                                                 Delete
-                                            </button>
+                                            </Button>
                                         </td>
                                     </tr>
                                 );
@@ -284,19 +293,12 @@ export default function ModifierGroupsPage() {
                         </div>
 
                         <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-                            <button
-                                onClick={() => { setShowCreate(false); setForm(emptyForm); setErrors({}); }}
-                                className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-soft-grey"
-                            >
+                            <Button variant="outline" onClick={() => { setShowCreate(false); setForm(emptyForm); setErrors({}); }}>
                                 Cancel
-                            </button>
-                            <button
-                                onClick={handleCreate}
-                                disabled={loading || !form.name.trim()}
-                                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50"
-                            >
+                            </Button>
+                            <Button onClick={handleCreate} disabled={loading || !form.name.trim()}>
                                 {loading ? "Creating…" : "Create Group"}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -315,25 +317,33 @@ export default function ModifierGroupsPage() {
                         <div className="border-b border-border px-6 py-4">
                             <h3 className="text-lg font-semibold text-black">Delete Modifier Group</h3>
                         </div>
-                        <div className="px-6 py-4">
+                        <div className="px-6 py-4 space-y-3">
                             <p className="text-sm text-light-grey">
-                                Are you sure you want to delete this modifier group? This action cannot be undone.
+                                Are you sure you want to delete{" "}
+                                <strong className="text-black">{deleteTargetGroup?.name ?? "this modifier group"}</strong>?
+                                Its modifiers will be deleted too. This action cannot be undone.
                             </p>
+                            {productsUsingGroup.length > 0 && (
+                                <div className="rounded-lg border border-error/30 bg-error/5 px-3 py-2.5">
+                                    <p className="text-xs font-medium text-error">
+                                        ⚠ Used by {productsUsingGroup.length} product
+                                        {productsUsingGroup.length !== 1 ? "s" : ""}
+                                    </p>
+                                    <p className="mt-1 text-xs text-light-grey">
+                                        This group will be removed from{" "}
+                                        {productsUsingGroup.slice(0, 5).map((p) => p.name ?? "Unnamed").join(", ")}
+                                        {productsUsingGroup.length > 5 ? `, +${productsUsingGroup.length - 5} more` : ""}.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                         <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-                            <button
-                                onClick={() => setDeleteTargetId(null)}
-                                className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-soft-grey"
-                            >
+                            <Button variant="outline" onClick={() => setDeleteTargetId(null)}>
                                 Cancel
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                disabled={deleteLoading}
-                                className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50"
-                            >
+                            </Button>
+                            <Button variant="solid-error" onClick={handleDelete} disabled={deleteLoading}>
                                 {deleteLoading ? "Deleting…" : "Delete"}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>

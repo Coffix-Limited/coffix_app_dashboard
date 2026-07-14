@@ -5,9 +5,12 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Image from "next/image";
 import { useStoreStore } from "../store/useStoreStore";
+import { useAuth } from "@/app/lib/AuthContext";
 import { isStoreOpenAt, DayHours, HolidayHours, Store } from "../interface/store";
 import { StoreService } from "../service/StoreService";
 import { formatTime } from "@/app/utils/formatting";
+import { Button } from "@/components/ui/button";
+import { ImageUploadField } from "@/components/components/ImageUploadField";
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
 type Day = typeof DAYS[number];
@@ -19,6 +22,7 @@ type StoreEditForm = {
   contactNumber: string;
   location: string;
   address: string;
+  city: string;
   imageUrl: string;
   gstNumber: string;
   invoiceText: string;
@@ -27,10 +31,11 @@ type StoreEditForm = {
 };
 
 const REQUIRED: (keyof Omit<StoreEditForm, "openingHours">)[] = [
-  "name", "email", "contactNumber", "location", "address",
+  "name", "email", "contactNumber", "location", "address", "printerId",
+  "gstNumber", "invoiceText",
 ];
 
-type DialogMode = "edit-store" | "add-holiday" | "edit-holiday" | "delete-holiday" | null;
+type DialogMode = "edit-store" | "edit-hours" | "add-holiday" | "edit-holiday" | "delete-holiday" | "delete-store" | null;
 
 type HolidayForm = {
   date: string;
@@ -64,6 +69,7 @@ function storeToForm(store: Store): StoreEditForm {
     contactNumber: store.contactNumber ?? "",
     location: store.location ?? "",
     address: store.address ?? "",
+    city: store.city ?? "",
     imageUrl: store.imageUrl ?? "",
     gstNumber: store.gstNumber ?? "",
     invoiceText: store.invoiceText ?? "",
@@ -75,6 +81,11 @@ function storeToForm(store: Store): StoreEditForm {
 export default function StoreDetailPage() {
   const { storeId } = useParams<{ storeId: string }>();
   const router = useRouter();
+
+  const { currentStaff } = useAuth();
+  const isAdmin = currentStaff?.role === "admin";
+  const myStoreIds = currentStaff?.storeIds ?? [];
+  const canAccess = isAdmin || myStoreIds.includes(storeId);
 
   const stores = useStoreStore((s) => s.stores);
 
@@ -94,6 +105,36 @@ export default function StoreDetailPage() {
     setForm(storeToForm(store));
     setErrors({});
     setDialog("edit-store");
+  }
+
+  function openEditHours() {
+    if (!store) return;
+    setForm(storeToForm(store));
+    setErrors({});
+    setDialog("edit-hours");
+  }
+
+  async function handleSaveHours() {
+    if (!form || !store) return;
+
+    const openingHours: Record<string, DayHours> = Object.fromEntries(
+      DAYS.map((day) => {
+        const { isOpen, open, close } = form.openingHours[day];
+        return [day, { isOpen, open, close }];
+      }),
+    );
+
+    setLoading(true);
+    try {
+      await StoreService.updateStore(store.docId, { openingHours });
+      toast.success("Opening hours updated.");
+      closeDialog();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update opening hours. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   function closeDialog() {
@@ -166,6 +207,21 @@ export default function StoreDetailPage() {
     }
   }
 
+  async function handleDeleteStore() {
+    if (!store) return;
+    setLoading(true);
+    try {
+      await StoreService.deleteStore(store.docId);
+      toast.success("Store deleted.");
+      router.push("/dashboard/stores");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete store. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleDeleteHoliday() {
     if (!store || !editingDate) return;
     const updatedMap: Record<string, HolidayHours> = { ...store.holidayHours };
@@ -224,10 +280,11 @@ export default function StoreDetailPage() {
         contactNumber: form.contactNumber.trim(),
         location: form.location.trim(),
         address: form.address.trim(),
-        imageUrl: form.imageUrl.trim() || undefined,
-        gstNumber: form.gstNumber.trim() || undefined,
-        invoiceText: form.invoiceText.trim() || undefined,
-        printerId: form.printerId.trim() || undefined,
+        city: form.city.trim() || null,
+        ...(form.imageUrl.trim() ? { imageUrl: form.imageUrl.trim() } : { imageUrl: "" }),
+        gstNumber: form.gstNumber.trim(),
+        invoiceText: form.invoiceText.trim(),
+        printerId: form.printerId.trim(),
         openingHours,
       });
       toast.success("Store updated successfully.");
@@ -240,7 +297,7 @@ export default function StoreDetailPage() {
     }
   }
 
-  if (!store) {
+  if (!store || !canAccess) {
     return (
       <div className="flex h-64 items-center justify-center text-light-grey">
         Store not found.
@@ -256,12 +313,13 @@ export default function StoreDetailPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <button
+          <Button
             onClick={() => router.push("/dashboard/stores")}
-            className="mb-2 text-xs text-light-grey hover:text-black"
+            variant="outline"
+            size="sm"
           >
             ← Back to Stores
-          </button>
+          </Button>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold text-black">{store.name ?? "—"}</h1>
             {isDisabled ? (
@@ -282,36 +340,51 @@ export default function StoreDetailPage() {
             )}
           </div>
         </div>
-        <button
-          onClick={openEdit}
-          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-black transition-colors hover:border-primary hover:text-primary"
-        >
-          Edit
-        </button>
+        {isAdmin && (
+          <div className="flex gap-2">
+            <Button
+              variant="destructive"
+              onClick={() => setDialog("delete-store")}
+            >
+              Delete
+            </Button>
+            <Button
+              onClick={openEdit}
+              variant="outline"
+            >
+              Edit
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* Store image — square to match 1200×1200 mobile app asset */}
+      {store.imageUrl ? (
+        <div className="relative h-48 w-48 overflow-hidden rounded-xl">
+          <Image
+            src={store.imageUrl}
+            alt={store.name ?? "Store"}
+            fill
+            sizes="192px"
+            className="object-cover"
+          />
+        </div>
+      ) : (
+        <div className="flex h-48 w-48 items-center justify-center rounded-xl bg-primary text-4xl font-bold text-white">
+          {(store.name ?? "?")[0].toUpperCase()}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Store Info Card */}
         <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
-          {store.imageUrl ? (
-            <Image
-              src={store.imageUrl}
-              alt={store.name ?? "Store"}
-              width={600}
-              height={200}
-              className="h-44 w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-44 items-center justify-center bg-primary text-5xl font-bold text-white">
-              {(store.name ?? "?")[0].toUpperCase()}
-            </div>
-          )}
           <div className="divide-y divide-border">
             {[
               { label: "Email", value: store.email },
               { label: "Contact", value: store.contactNumber },
               { label: "Location", value: store.location },
               { label: "Address", value: store.address },
+              { label: "City", value: store.city },
               { label: "GST Number", value: store.gstNumber },
               { label: "Invoice Text", value: store.invoiceText },
               { label: "Printer ID", value: store.printerId },
@@ -326,8 +399,11 @@ export default function StoreDetailPage() {
 
         {/* Opening Hours Card */}
         <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
-          <div className="border-b border-border px-4 py-3">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h2 className="font-semibold text-black">Opening Hours</h2>
+            <Button onClick={openEditHours} variant="outline" size="sm">
+              Edit Hours
+            </Button>
           </div>
           <div className="divide-y divide-border">
             {DAYS.map((day) => {
@@ -362,12 +438,11 @@ export default function StoreDetailPage() {
           <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <h2 className="font-semibold text-black">Special Operating Hours</h2>
-              <button
+              <Button
                 onClick={openAddHoliday}
-                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-80"
               >
                 + Add Holiday
-              </button>
+              </Button>
             </div>
             {sorted.length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-light-grey">No Special Operating Hours set.</p>
@@ -379,7 +454,11 @@ export default function StoreDetailPage() {
                     weekday: "short", year: "numeric", month: "short", day: "numeric",
                   });
                   return (
-                    <div key={dateKey} className={`flex items-center justify-between px-4 py-3 ${isPast ? "opacity-90" : ""}`}>
+                    <div
+                      key={dateKey}
+                      className={`flex cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-muted/50 ${isPast ? "opacity-90" : ""}`}
+                      onClick={() => openEditHoliday(dateKey, entry)}
+                    >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-black">{dateLabel}</span>
@@ -396,18 +475,13 @@ export default function StoreDetailPage() {
                             Closed
                           </span>
                         )}
-                        <button
-                          onClick={() => openEditHoliday(dateKey, entry)}
-                          className="text-xs text-light-grey hover:text-primary"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => openDeleteHoliday(dateKey)}
-                          className="text-xs text-light-grey hover:text-error"
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); openDeleteHoliday(dateKey); }}
                         >
                           Delete
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   );
@@ -447,12 +521,12 @@ export default function StoreDetailPage() {
                   {errors.name && <p className="mt-1 text-xs text-error">Required.</p>}
                 </div>
 
-                <div>
-                  <label className="mb-1.5 block text-xs text-light-grey">Image URL</label>
-                  <input
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
+                <div className="col-span-2">
+                  <ImageUploadField
                     value={form.imageUrl}
-                    onChange={(e) => setField("imageUrl", e.target.value)}
+                    onChange={(url) => setField("imageUrl", url)}
+                    label="Store Image"
+                    disabled={loading}
                   />
                 </div>
 
@@ -498,31 +572,43 @@ export default function StoreDetailPage() {
                   {errors.address && <p className="mt-1 text-xs text-error">Required.</p>}
                 </div>
 
-                <div>
-                  <label className="mb-1.5 block text-xs text-light-grey">GST Number</label>
+                <div className="col-span-2">
+                  <label className="mb-1.5 block text-xs text-light-grey">City</label>
                   <input
                     className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
+                    value={form.city}
+                    onChange={(e) => setField("city", e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs text-light-grey">GST Number *</label>
+                  <input
+                    className={`w-full rounded-lg border px-3 py-2 text-sm text-black outline-none focus:border-primary ${errors.gstNumber ? "border-error" : "border-border"}`}
                     value={form.gstNumber}
                     onChange={(e) => setField("gstNumber", e.target.value)}
                   />
+                  {errors.gstNumber && <p className="mt-1 text-xs text-error">Required.</p>}
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs text-light-grey">Invoice Text</label>
+                  <label className="mb-1.5 block text-xs text-light-grey">Invoice Text *</label>
                   <input
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
+                    className={`w-full rounded-lg border px-3 py-2 text-sm text-black outline-none focus:border-primary ${errors.invoiceText ? "border-error" : "border-border"}`}
                     value={form.invoiceText}
                     onChange={(e) => setField("invoiceText", e.target.value)}
                   />
+                  {errors.invoiceText && <p className="mt-1 text-xs text-error">Required.</p>}
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs text-light-grey">Printer ID</label>
+                  <label className="mb-1.5 block text-xs text-light-grey">Printer ID *</label>
                   <input
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
+                    className={`w-full rounded-lg border px-3 py-2 text-sm text-black outline-none focus:border-primary ${errors.printerId ? "border-error" : "border-border"}`}
                     value={form.printerId}
                     onChange={(e) => setField("printerId", e.target.value)}
                   />
+                  {errors.printerId && <p className="mt-1 text-xs text-error">Required.</p>}
                 </div>
               </div>
 
@@ -569,19 +655,71 @@ export default function StoreDetailPage() {
             </div>
 
             <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-              <button
+              <Button
+                variant="outline"
                 onClick={closeDialog}
-                className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleUpdate}
                 disabled={loading}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50"
               >
                 {loading ? "Saving…" : "Save Changes"}
-              </button>
+              </Button>
+            </div>
+          </>)}
+
+          {/* ── Edit Opening Hours (store managers + admins) ── */}
+          {dialog === "edit-hours" && form && (<>
+            <div className="border-b border-border px-6 py-4">
+              <h3 className="text-lg font-semibold text-black">Edit Opening Hours</h3>
+            </div>
+            <div className="max-h-[72vh] overflow-y-auto px-6 py-4">
+              <div className="overflow-hidden rounded-lg border border-border">
+                {DAYS.map((day, i) => {
+                  const hours = form.openingHours[day];
+                  return (
+                    <div
+                      key={day}
+                      className={`flex items-center gap-3 px-3 py-2.5 ${i !== DAYS.length - 1 ? "border-b border-border" : ""} ${!hours.isOpen ? "opacity-50" : ""}`}
+                    >
+                      <label className="flex w-28 shrink-0 cursor-pointer items-center gap-2 text-sm font-medium capitalize text-black">
+                        <input
+                          type="checkbox"
+                          checked={hours.isOpen}
+                          onChange={(e) => setDayHours(day, { isOpen: e.target.checked })}
+                          className="accent-primary"
+                        />
+                        {day}
+                      </label>
+                      <input
+                        type="time"
+                        disabled={!hours.isOpen}
+                        value={hours.open}
+                        onChange={(e) => setDayHours(day, { open: e.target.value })}
+                        className="rounded-md border border-border px-2 py-1 text-xs text-black outline-none focus:border-primary disabled:cursor-not-allowed"
+                      />
+                      <span className="text-xs text-light-grey">to</span>
+                      <input
+                        type="time"
+                        disabled={!hours.isOpen}
+                        value={hours.close}
+                        onChange={(e) => setDayHours(day, { close: e.target.value })}
+                        className="rounded-md border border-border px-2 py-1 text-xs text-black outline-none focus:border-primary disabled:cursor-not-allowed"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
+              <Button variant="outline" onClick={closeDialog}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveHours} disabled={loading}>
+                {loading ? "Saving…" : "Save Hours"}
+              </Button>
             </div>
           </>)}
 
@@ -656,19 +794,18 @@ export default function StoreDetailPage() {
                 )}
               </div>
               <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-                <button
+                <Button
+                  variant="outline"
                   onClick={closeDialog}
-                  className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleSaveHoliday}
                   disabled={loading}
-                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50"
                 >
                   {loading ? "Saving…" : dialog === "add-holiday" ? "Add Holiday" : "Save Changes"}
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -694,19 +831,40 @@ export default function StoreDetailPage() {
                 </p>
               </div>
               <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-                <button
+                <Button
                   onClick={closeDialog}
-                  className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleDeleteHoliday}
                   disabled={loading}
-                  className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50"
                 >
                   {loading ? "Removing…" : "Remove"}
-                </button>
+                </Button>
+              </div>
+            </>
+          )}
+
+          {/* ── Delete Store ── */}
+          {dialog === "delete-store" && (
+            <>
+              <div className="border-b border-border px-6 py-4">
+                <h3 className="text-lg font-semibold text-black">Delete Store</h3>
+              </div>
+              <div className="px-6 py-4">
+                <p className="text-sm text-black">
+                  Are you sure you want to delete{" "}
+                  <span className="font-medium">{store.name}</span>? This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
+                <Button variant="outline" onClick={closeDialog} disabled={loading}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={handleDeleteStore} disabled={loading}>
+                  {loading ? "Deleting…" : "Delete Store"}
+                </Button>
               </div>
             </>
           )}

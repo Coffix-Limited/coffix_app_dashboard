@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useDashboardStore } from "./store/useDashboardStore";
+import { useProductSortStore } from "./store/useProductSortStore";
 import { useStoreStore } from "../stores/store/useStoreStore";
 import { Product } from "./interface/product";
 import { ProductService } from "./service/ProductService";
@@ -23,13 +24,14 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ProductsFilterBar } from "./components/ProductsFilterBar";
+import { ImageUploadField } from "@/components/components/ImageUploadField";
+import { useAuth } from "@/app/lib/AuthContext";
 
 type NewProductForm = {
   name: string;
   imageUrl: string;
   price: string;
   cost: string;
-  order: string;
   categoryId: string;
   modifierGroupIds: string[];
   availableToStores: string[];
@@ -40,7 +42,6 @@ const emptyForm: NewProductForm = {
   imageUrl: "",
   price: "",
   cost: "",
-  order: "",
   categoryId: "",
   modifierGroupIds: [],
   availableToStores: [],
@@ -75,23 +76,20 @@ function MultiSelect({
         <label className="text-xs text-black">{label} *</label>
         {showSelectAll && options.length > 0 && (
           <div className="flex gap-2">
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={() => onChange(options.map((o) => o.value))}
               disabled={allSelected}
-              className="text-xs text-primary hover:underline disabled:opacity-40"
             >
               Select all
-            </button>
-            <span className="text-xs text-black">·</span>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
               onClick={() => onChange([])}
               disabled={selected.length === 0}
-              className="text-xs text-black hover:text-black hover:underline disabled:opacity-40"
             >
               Unselect all
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -130,23 +128,19 @@ export default function ProductsPage() {
 
   const router = useRouter();
   type NumberRange = { min: string; max: string };
-  type ProductSortKey = "name" | "price" | "cost";
-  type SortDir = "asc" | "desc";
+
+  const sortKey = useProductSortStore((s) => s.sortKey);
+  const sortDir = useProductSortStore((s) => s.sortDir);
+  const toggleSort = useProductSortStore((s) => s.toggleSort);
 
   const [search, setSearch] = useState("");
-  const [sortKey, setSortKey] = useState<ProductSortKey>("name");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const [filterCategoryId, setFilterCategoryId] = useState("All");
   const [filterPrice, setFilterPrice] = useState<NumberRange>({ min: "", max: "" });
   const [filterCost, setFilterCost] = useState<NumberRange>({ min: "", max: "" });
   const [filterAvailableInStore, setFilterAvailableInStore] = useState("All");
   const [filterDisabledInStore, setFilterDisabledInStore] = useState("All");
-
-  function toggleSort(key: ProductSortKey) {
-    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortKey(key); setSortDir("asc"); }
-  }
+  const { currentStaff } = useAuth();
 
   function clearAllFilters() {
     setSearch("");
@@ -160,6 +154,57 @@ export default function ProductsPage() {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
+
+  const [showBulkStores, setShowBulkStores] = useState(false);
+  const [bulkStoreChanges, setBulkStoreChanges] = useState<Map<string, boolean | null>>(new Map());
+
+  function openBulkStores() {
+    const selectedProducts = products.filter((p) => selectedIds.has(p.docId ?? ""));
+    const initial = new Map<string, boolean | null>();
+    for (const store of stores) {
+      const count = selectedProducts.filter((p) => (p.availableToStores ?? []).includes(store.docId)).length;
+      if (count === selectedProducts.length) initial.set(store.docId, true);
+      else if (count === 0) initial.set(store.docId, false);
+      else initial.set(store.docId, null); // indeterminate
+    }
+    setBulkStoreChanges(initial);
+    setShowBulkStores(true);
+  }
+
+  async function handleBulkStoreUpdate() {
+    setBulkLoading(true);
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map((id) => {
+          const product = products.find((p) => p.docId === id)!;
+          let available = [...(product.availableToStores ?? [])];
+          let disabled = [...(product.disabledStores ?? [])];
+
+          for (const [storeId, checked] of bulkStoreChanges) {
+            if (checked === true && !available.includes(storeId)) {
+              available.push(storeId);
+            } else if (checked === false) {
+              available = available.filter((s) => s !== storeId);
+              disabled = disabled.filter((s) => s !== storeId);
+            }
+            // null = indeterminate / unchanged — no-op
+          }
+
+          return ProductService.updateProduct(id, {
+            availableToStores: available,
+            disabledStores: disabled,
+          });
+        }),
+      );
+      toast.success("Stores updated for selected products.");
+      setShowBulkStores(false);
+      setSelectedIds(new Set());
+    } catch {
+      toast.error("Failed to update stores.");
+    } finally {
+      setBulkLoading(false);
+    }
+  }
 
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<NewProductForm>(emptyForm);
@@ -247,10 +292,20 @@ export default function ProductsPage() {
       return true;
     });
     result = [...result].sort((a, b) => {
+      // Category is always the primary grouping key so same-category
+      // products stay together regardless of the active sort column.
+      const catCmp = (getCategoryName(a.categoryId) ?? "").localeCompare(
+        getCategoryName(b.categoryId) ?? "",
+      );
+      if (catCmp !== 0) return catCmp;
+
+      // Within a category, order by the active sort column.
       let cmp = 0;
-      if (sortKey === "name") cmp = (a.order ?? 0) - (b.order ?? 0) || (a.name ?? "").localeCompare(b.name ?? "");
-      else if (sortKey === "price") cmp = (a.price ?? 0) - (b.price ?? 0);
-      else cmp = (a.cost ?? 0) - (b.cost ?? 0);
+      if (sortKey === "price") cmp = (a.price ?? 0) - (b.price ?? 0);
+      else if (sortKey === "cost") cmp = (a.cost ?? 0) - (b.cost ?? 0);
+      else // "name" and "category" both fall back to manual order then name
+        cmp = (a.order ?? 0) - (b.order ?? 0) || (a.name ?? "").localeCompare(b.name ?? "");
+
       return sortDir === "asc" ? cmp : -cmp;
     });
     return result;
@@ -289,19 +344,17 @@ export default function ProductsPage() {
     });
   }
 
-  function handleCopyProduct(product: Product) {
-    setForm({
-      name: `Copy of ${product.name ?? ""}`,
-      imageUrl: product.imageUrl ?? "",
-      price: String(product.price ?? ""),
-      cost: String(product.cost ?? ""),
-      order: String(product.order ?? ""),
-      categoryId: product.categoryId ?? "",
-      modifierGroupIds: product.modifierGroupIds ?? [],
-      availableToStores: product.availableToStores ?? [],
-    });
-    setErrors({});
-    setShowCreate(true);
+  async function handleCopyProduct(product: Product) {
+    try {
+      const { docId, ...rest } = product;
+      await ProductService.createProduct({
+        ...rest,
+        name: `Copy of ${product.name ?? ""}`,
+      });
+      toast.success("Product duplicated successfully.");
+    } catch {
+      toast.error("Failed to duplicate product. Please try again.");
+    }
   }
 
   async function handleBulkDisable(disabled: boolean) {
@@ -510,11 +563,9 @@ export default function ProductsPage() {
   async function handleCreate() {
     const newErrors: Partial<Record<keyof NewProductForm, boolean>> = {
       name: !form.name.trim(),
-      price: !form.price,
-      cost: !form.cost,
-      order: !form.order,
+      price: form.price === "",
+      cost: form.cost === "",
       categoryId: !form.categoryId,
-      modifierGroupIds: form.modifierGroupIds.length === 0,
       availableToStores: form.availableToStores.length === 0,
     };
 
@@ -527,12 +578,14 @@ export default function ProductsPage() {
     setErrors({});
     setLoading(true);
     try {
+      const minOrder = products.length > 0 ? Math.min(...products.map((p) => p.order ?? 0)) : 0;
+      const imageUrl = form.imageUrl.trim();
       await ProductService.createProduct({
         name: form.name.trim(),
-        imageUrl: form.imageUrl.trim() || undefined,
+        ...(imageUrl && { imageUrl }),
         price: parseFloat(form.price),
         cost: parseFloat(form.cost),
-        order: parseInt(form.order),
+        order: minOrder - 1,
         categoryId: form.categoryId,
         modifierGroupIds: form.modifierGroupIds,
         availableToStores: form.availableToStores,
@@ -556,7 +609,7 @@ export default function ProductsPage() {
             {products.length} product{products.length !== 1 ? "s" : ""} total
           </p>
         </div>
-        <div className="flex gap-2">
+        {currentStaff?.role === "admin" && <div className="flex gap-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -564,14 +617,6 @@ export default function ProductsPage() {
             onChange={handleImportCSV}
             className="hidden"
           />
-{/* <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowImportInfo(true)}
-            disabled={importLoading}
-          >
-            {importLoading ? "Importing…" : "Import CSV"}
-          </Button> */}
           <Button
             variant="outline"
             onClick={exportToCSV}
@@ -581,7 +626,7 @@ export default function ProductsPage() {
           </Button>
           <Button
           onClick={() => setShowCreate(true)}>+ New Product</Button>
-        </div>
+        </div>}
       </div>
 
       <ProductsFilterBar
@@ -602,27 +647,34 @@ export default function ProductsPage() {
         <div className="flex items-center gap-3 rounded-xl border border-border bg-white px-4 py-2.5 shadow-(--shadow)">
           <span className="text-sm text-black">{selectedIds.size} selected</span>
           <div className="flex gap-2 ml-auto">
-            <button
+            <Button
               onClick={() => handleBulkDisable(false)}
               disabled={bulkLoading}
               className="rounded-lg bg-success px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-80 disabled:opacity-50"
             >
               Enable
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => handleBulkDisable(true)}
               disabled={bulkLoading}
               className="rounded-lg bg-error px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-80 disabled:opacity-50"
             >
               Disable
-            </button>
-            <button
+            </Button>
+            <Button
+              onClick={openBulkStores}
+              disabled={bulkLoading}
+              className="rounded-lg border border-border bg-white px-3 py-1.5 text-xs font-medium text-black transition-colors hover:bg-background disabled:opacity-50"
+            >
+              Update Stores
+            </Button>
+            <Button
+              variant="ghost"
               onClick={() => setSelectedIds(new Set())}
               disabled={bulkLoading}
-              className="text-xs text-black hover:text-black disabled:opacity-50"
             >
               Clear
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -647,7 +699,12 @@ export default function ProductsPage() {
               >
                 Product {sortKey === "name" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
               </th>
-              <th className="px-5 py-3 text-left font-medium text-black">Category</th>
+              <th
+                onClick={() => toggleSort("category")}
+                className="cursor-pointer select-none px-5 py-3 text-left font-medium text-black hover:text-black"
+              >
+                Category {sortKey === "category" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+              </th>
               <th
                 onClick={() => toggleSort("price")}
                 className="cursor-pointer select-none px-5 py-3 text-right font-medium text-black hover:text-black"
@@ -660,7 +717,7 @@ export default function ProductsPage() {
               >
                 Cost {sortKey === "cost" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
               </th>
-              <th className="w-10 px-4 py-3" />
+              {currentStaff?.role === "admin" && <th className="w-10 px-4 py-3" />}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -732,18 +789,20 @@ export default function ProductsPage() {
                     <td className="px-5 py-3 text-right text-black">
                       ${(product.cost ?? 0).toFixed(2)}
                     </td>
-                    <td className="w-10 px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        title="Duplicate product"
-                        onClick={() => handleCopyProduct(product)}
-                        className="opacity-0 group-hover:opacity-100 rounded-lg p-1.5 text-black transition-opacity hover:bg-[#f0f0f0] hover:text-black"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                        </svg>
-                      </button>
-                    </td>
+                    {currentStaff?.role === "admin" && (
+                      <td className="w-10 px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          title="Duplicate product"
+                          onClick={() => handleCopyProduct(product)}
+                          className="opacity-0 group-hover:opacity-100 rounded-lg p-1.5 text-black transition-opacity hover:bg-[#f0f0f0] hover:text-black"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                          </svg>
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })
@@ -754,7 +813,7 @@ export default function ProductsPage() {
 
       {/* ── Create Product Dialog ── */}
       <Dialog open={showCreate} onOpenChange={(open) => { if (!open) closeCreate(); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>New Product</DialogTitle>
           </DialogHeader>
@@ -772,12 +831,10 @@ export default function ProductsPage() {
                 {errors.name && <p className="mt-1 text-xs text-error">Name is required.</p>}
               </div>
               <div className="col-span-2">
-                <label className="mb-1.5 block text-xs text-black">Image URL</label>
-                <input
-                  className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
-                  placeholder="https://..."
+                <ImageUploadField
                   value={form.imageUrl}
-                  onChange={(e) => setField("imageUrl", e.target.value)}
+                  onChange={(url) => setField("imageUrl", url)}
+                  disabled={loading}
                 />
               </div>
               <div>
@@ -811,18 +868,6 @@ export default function ProductsPage() {
                   />
                 </div>
                 {errors.cost && <p className="mt-1 text-xs text-error">Required.</p>}
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs text-black">Order *</label>
-                <input
-                  type="number"
-                  min={0}
-                  className={`w-full rounded-lg border px-3 py-2 text-sm text-black outline-none focus:border-primary ${errors.order ? "border-error" : "border-border"}`}
-                  placeholder="0"
-                  value={form.order}
-                  onChange={(e) => setField("order", e.target.value)}
-                />
-                {errors.order && <p className="mt-1 text-xs text-error">Required.</p>}
               </div>
             </div>
 
@@ -897,6 +942,62 @@ export default function ProductsPage() {
             <Button variant="outline" onClick={() => setShowImportInfo(false)}>Cancel</Button>
             <Button onClick={() => { setShowImportInfo(false); fileInputRef.current?.click(); }}>
               Choose File →
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Bulk Update Stores Dialog ── */}
+      <Dialog open={showBulkStores} onOpenChange={(open) => { if (!open) setShowBulkStores(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Update Available Stores</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-black -mt-1">{selectedIds.size} product{selectedIds.size !== 1 ? "s" : ""} selected</p>
+          <div className="max-h-72 overflow-y-auto rounded-lg border border-border bg-white p-2 space-y-1">
+            {stores.length === 0 ? (
+              <p className="px-1 py-1 text-xs text-black">No stores available.</p>
+            ) : (
+              stores.map((store) => {
+                const state = bulkStoreChanges.get(store.docId);
+                const isIndeterminate = state === null;
+                const isChecked = state === true;
+                return (
+                  <label key={store.docId} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm text-black hover:bg-background">
+                    <input
+                      type="checkbox"
+                      checked={isChecked || isIndeterminate}
+                      ref={(el) => { if (el) el.indeterminate = isIndeterminate; }}
+                      onChange={() => {
+                        setBulkStoreChanges((prev) => {
+                          const next = new Map(prev);
+                          // cycle: indeterminate → checked, checked → unchecked, unchecked → checked
+                          if (state === null) next.set(store.docId, true);
+                          else if (state === true) next.set(store.docId, false);
+                          else next.set(store.docId, true);
+                          return next;
+                        });
+                      }}
+                      className="accent-primary"
+                    />
+                    <span className="flex-1">{store.name ?? store.docId}</span>
+                    {isIndeterminate && (
+                      <span className="text-xs text-black opacity-60">mixed</span>
+                    )}
+                  </label>
+                );
+              })
+            )}
+          </div>
+          <p className="text-xs text-black opacity-60">
+            Checked = add to all selected products. Unchecked = remove from all. Mixed = leave as-is.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkStores(false)} disabled={bulkLoading}>
+              Cancel
+            </Button>
+            <Button onClick={handleBulkStoreUpdate} disabled={bulkLoading || stores.length === 0}>
+              {bulkLoading ? "Applying…" : "Apply Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

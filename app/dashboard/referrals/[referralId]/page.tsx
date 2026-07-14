@@ -1,12 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { useReferralStore } from "../store/useReferralStore";
 import { useUserStore } from "@/app/dashboard/users/store/useUserStore";
-import { ReferralService } from "../service/ReferralService";
 import { formatDateTime } from "@/app/utils/formatting";
 
 function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
@@ -58,25 +54,6 @@ export default function ReferralDetailPage() {
     ? (users.find((u) => u.docId === referral.referrer)?.email ?? referral.referrer)
     : "—";
 
-  const [toggling, setToggling] = useState(false);
-
-  async function handleToggleDisabled() {
-    if (!referral?.docId) return;
-    setToggling(true);
-    try {
-      await ReferralService.updateReferral(referral.docId, {
-        disabled: !referral.disabled,
-      });
-      toast.success(
-        referral.disabled ? "Referral re-enabled." : "Referral disabled."
-      );
-    } catch {
-      toast.error("Failed to update referral. Please try again.");
-    } finally {
-      setToggling(false);
-    }
-  }
-
   if (!referral) {
     return (
       <div className="space-y-6">
@@ -107,31 +84,10 @@ export default function ReferralDetailPage() {
           <h1 className="text-2xl font-semibold text-black">Referral Detail</h1>
           <p className="mt-1 font-mono text-xs text-black">{referral.docId}</p>
         </div>
-        <div className="flex items-center gap-3">
-          {referral.disabled ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-black px-3 py-1.5 text-xs font-medium text-white">
-              <span className="h-1.5 w-1.5 rounded-full bg-white" />
-              Disabled
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-success px-3 py-1.5 text-xs font-medium text-white">
-              <span className="h-1.5 w-1.5 rounded-full bg-white" />
-              Active
-            </span>
-          )}
-          <Button
-            size="sm"
-            variant={referral.disabled ? "default" : "outline"}
-            onClick={handleToggleDisabled}
-            disabled={toggling}
-          >
-            {toggling
-              ? "Saving…"
-              : referral.disabled
-              ? "Re-enable"
-              : "Disable"}
-          </Button>
-        </div>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-black">
+          <span className="h-1.5 w-1.5 rounded-full bg-black" />
+          {referral.status ?? "—"}
+        </span>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -140,14 +96,22 @@ export default function ReferralDetailPage() {
           rows={[
             { label: "Referrer", value: referrerEmail },
             { label: "Referee (Email)", value: referral.referee ?? "—" },
-            { label: "Date & Time", value: formatDateTime(referral.referralTime) },
+            { label: "Status", value: referral.status ?? "—" },
+            { label: "Referral Time", value: formatDateTime(referral.referralTime) },
+            { label: "Signup Time", value: formatDateTime(referral.signupTime) },
+            { label: "Valid Time", value: formatDateTime(referral.validTime) },
           ]}
         />
         <InfoCard
-          title="Status"
+          title="Identifiers"
           rows={[
-            { label: "Status", value: referral.disabled ? "Disabled" : "Active" },
             { label: "Document ID", value: referral.docId ?? "—", mono: true },
+            { label: "Coupon ID", value: referral.couponId ?? "—", mono: true },
+            {
+              label: "Referee Coupon ID",
+              value: referral.refereeCouponId ?? "—",
+              mono: true,
+            },
           ]}
         />
       </div>

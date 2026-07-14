@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -12,7 +13,7 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await fetch(
+      const res = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/forgot-password`,
         {
           method: "POST",
@@ -20,9 +21,18 @@ export default function ForgotPasswordPage() {
           body: JSON.stringify({ email }),
         }
       );
+
+      if (res.ok) {
+        toast.success(
+          "If that email is registered, a reset link has been sent."
+        );
+        setEmail("");
+      } else {
+        toast.error("Something went wrong. Please try again.");
+      }
+    } catch {
+      toast.error("Something went wrong. Please try again.");
     } finally {
-      toast.success("If that email is registered, a reset link has been sent.");
-      setEmail("");
       setSubmitting(false);
     }
   }
@@ -50,13 +60,9 @@ export default function ForgotPasswordPage() {
               disabled={submitting}
             />
           </div>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-          >
+          <Button type="submit" disabled={submitting}>
             {submitting ? "Sending…" : "Send reset link"}
-          </button>
+          </Button>
         </form>
         <p className="mt-4 text-center text-xs text-light-grey">
           <Link href="/login" className="text-primary hover:underline">

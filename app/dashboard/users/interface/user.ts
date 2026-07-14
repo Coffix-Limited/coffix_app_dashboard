@@ -13,13 +13,21 @@ export interface AppUser {
   preferredStoreName?: string;
   createdAt?: Date;
   emailVerified?: boolean;
-  getPurchaseInfoByMail?: boolean;
-  getPromotions?: boolean;
-  allowWinACoffee?: boolean;
   lastLogin?: Date;
   disabled?: boolean;
   qrId?: string;
   fcmToken?: string;
   appVersion?: string;
   creditExpiry?: Date;
+
+  // Flags for different features
+  scheduleOrder?: boolean;
+  shareCredit?: boolean;
+  withdrawBalance?: boolean;
+  coffixCreditAvailable?: boolean;
+  getPurchaseInfoByMail?: boolean;
+  getPromotions?: boolean;
+  allowWinACoffee?: boolean;
+  allowCoffeeForHome?: boolean;
+  allowNotifications?: boolean;
 }

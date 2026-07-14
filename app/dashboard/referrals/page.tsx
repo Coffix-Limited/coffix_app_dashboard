@@ -82,8 +82,8 @@ export default function ReferralsPage() {
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
     let result = referrals.filter((r) => {
-      if (statusFilter === "Active" && r.disabled) return false;
-      if (statusFilter === "Disabled" && !r.disabled) return false;
+      // if (statusFilter === "Active" && r.disabled) return false;
+      // if (statusFilter === "Disabled" && !r.disabled) return false;
       if (query) {
         return (
           (r.referrer ?? "").toLowerCase().includes(query) ||
@@ -116,7 +116,7 @@ export default function ReferralsPage() {
         escapeCSV(r.referrer ?? ""),
         escapeCSV(r.referee ?? ""),
         escapeCSV(formatDateTime(r.referralTime)),
-        String(r.disabled ?? false),
+        // String(r.disabled ?? false),
       ].join(",")
     );
     triggerCSVDownload([headers.join(","), ...rows].join("\n"), `referrals-${new Date().toISOString().slice(0, 10)}.csv`);
@@ -165,11 +165,11 @@ export default function ReferralsPage() {
             hasError = true;
           }
 
-          if (row.disabled !== undefined && row.disabled !== "" &&
-            !["true", "false"].includes(row.disabled.toLowerCase())) {
-            errors.push({ row: rowNum, field: "disabled", reason: 'Must be "true" or "false"' });
-            hasError = true;
-          }
+          // if (row.disabled !== undefined && row.disabled !== "" &&
+          //   !["true", "false"].includes(row.disabled.toLowerCase())) {
+          //   errors.push({ row: rowNum, field: "disabled", reason: 'Must be "true" or "false"' });
+          //   hasError = true;
+          // }
 
           if (!hasError) validRows.push(row);
         });
@@ -191,9 +191,9 @@ export default function ReferralsPage() {
       let count = 0;
       for (const row of importPreview.validRows) {
         const update: Partial<Omit<Referral, "docId">> = {};
-        if (row.disabled !== undefined && row.disabled !== "") {
-          update.disabled = row.disabled.toLowerCase() === "true";
-        }
+        // if (row.disabled !== undefined && row.disabled !== "") {
+        //   update.disabled = row.disabled.toLowerCase() === "true";
+        // }
         await ReferralService.updateReferral(row.docId, update);
         count++;
       }
@@ -295,8 +295,8 @@ export default function ReferralsPage() {
                     {formatDateTime(referral.referralTime)}
                   </td>
                   <td className="px-5 py-3">
-                    {referral.disabled ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-black px-2.5 py-1 text-xs font-medium text-white">
+                    {/* {referral.disabled ? ( */}    
+                      {/* <span className="inline-flex items-center gap-1.5 rounded-full bg-black px-2.5 py-1 text-xs font-medium text-white">
                         <span className="h-1.5 w-1.5 rounded-full bg-white" />
                         Disabled
                       </span>
@@ -305,7 +305,7 @@ export default function ReferralsPage() {
                         <span className="h-1.5 w-1.5 rounded-full bg-white" />
                         Active
                       </span>
-                    )}
+                    )} */}
                   </td>
                 </tr>
               ))

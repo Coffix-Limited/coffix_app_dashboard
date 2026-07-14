@@ -11,6 +11,7 @@ import {
   setDoc,
   Unsubscribe,
   updateDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { Product } from "../interface/product";
 import { Modifier } from "../interface/modifier";
@@ -92,8 +93,23 @@ export const ProductService = {
     data: Partial<Omit<ModifierGroup, "docId">>,
   ) => updateDoc(doc(db, "modifierGroups", docId), data as DocumentData),
 
-  deleteModifierGroup: (docId: string) =>
-    deleteDoc(doc(db, "modifierGroups", docId)),
+  // Deletes a modifier group along with its modifier documents and removes the
+  // group ID from every product that references it — all in one atomic batch.
+  deleteModifierGroupCascade: async (
+    groupDocId: string,
+    modifierIds: string[],
+    affectedProductIds: string[],
+  ) => {
+    const batch = writeBatch(db);
+    affectedProductIds.forEach((pid) =>
+      batch.update(doc(db, "products", pid), {
+        modifierGroupIds: arrayRemove(groupDocId),
+      }),
+    );
+    modifierIds.forEach((mid) => batch.delete(doc(db, "modifiers", mid)));
+    batch.delete(doc(db, "modifierGroups", groupDocId));
+    await batch.commit();
+  },
 
   createCategory: async (data: Omit<Category, "docId">) => {
     const ref = doc(collection(db, "productCategories"));

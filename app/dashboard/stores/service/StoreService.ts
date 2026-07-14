@@ -2,6 +2,7 @@ import { db } from "@/app/lib/firebase";
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   DocumentData,
   onSnapshot,
@@ -32,4 +33,6 @@ export const StoreService = {
 
   updateStore: (docId: string, data: Partial<Omit<Store, "docId">>) =>
     updateDoc(doc(db, "stores", docId), data as DocumentData),
+
+  deleteStore: (docId: string) => deleteDoc(doc(db, "stores", docId)),
 };

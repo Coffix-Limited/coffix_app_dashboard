@@ -8,7 +8,8 @@ import { useUserStore } from "../store/useUserStore";
 import { useStoreStore } from "@/app/dashboard/stores/store/useStoreStore";
 import { UserService } from "@/app/dashboard/users/service/UserService";
 import { AppUser } from "../interface/user";
-import { formatDate, formatDateTime } from "@/app/utils/formatting";
+import { formatDate, formatDateTime } from "@/app/utils/formatting"
+import { Switch } from "@/components/ui/switch";
 // ─── Formatting helpers ───────────────────────────────────────────────────────
 
 function formatBool(value: boolean | undefined): string {
@@ -75,6 +76,12 @@ type UserEditForm = {
   allowWinACoffee: boolean;
   disabled: boolean;
   emailVerified: boolean;
+  scheduleOrder: boolean;
+  shareCredit: boolean;
+  withdrawBalance: boolean;
+  coffixCreditAvailable: boolean;
+  allowCoffeeForHome: boolean;
+  allowNotifications: boolean;
 };
 
 type DialogMode = "edit-user" | null;
@@ -99,6 +106,12 @@ function userToForm(user: AppUser): UserEditForm {
     allowWinACoffee: user.allowWinACoffee ?? false,
     disabled: user.disabled ?? false,
     emailVerified: user.emailVerified ?? false,
+    scheduleOrder: user.scheduleOrder ?? false,
+    shareCredit: user.shareCredit ?? false,
+    withdrawBalance: user.withdrawBalance ?? false,
+    coffixCreditAvailable: user.coffixCreditAvailable ?? false,
+    allowCoffeeForHome: user.allowCoffeeForHome ?? false,
+    allowNotifications: user.allowNotifications ?? false,
   };
 }
 
@@ -129,6 +142,10 @@ export default function UserDetailPage() {
     user.nickName ||
     "—";
 
+  const preferredStore = stores.find((s) => s.docId === user.preferredStoreId);
+  const preferredStoreLabel =
+    preferredStore?.name ?? user.preferredStoreName ?? "—";
+
   // ── Handlers ──
 
   function openEdit() {
@@ -156,7 +173,7 @@ export default function UserDetailPage() {
     if (form.qrId.trim() && !/^\d{4}-\d{4}-\d{4}-\d{4}$/.test(form.qrId.trim())) {
       newErrors.qrId = true;
     }
-    if (form.appVersion.trim() && !/^\d+\.\d+\.\d+\+\d+$/.test(form.appVersion.trim())) {
+    if (form.appVersion.trim() && !/^\d+\.\d+\.\d+.*$/.test(form.appVersion.trim())) {
       newErrors.appVersion = true;
     }
 
@@ -191,6 +208,12 @@ export default function UserDetailPage() {
         allowWinACoffee: form.allowWinACoffee,
         disabled: form.disabled,
         emailVerified: form.emailVerified,
+        scheduleOrder: form.scheduleOrder,
+        shareCredit: form.shareCredit,
+        withdrawBalance: form.withdrawBalance,
+        coffixCreditAvailable: form.coffixCreditAvailable,
+        allowCoffeeForHome: form.allowCoffeeForHome,
+        allowNotifications: form.allowNotifications,
       });
       toast.success("User updated successfully.");
       closeDialog();
@@ -210,16 +233,18 @@ export default function UserDetailPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => router.push("/dashboard/users")}
-            className="mb-2 text-xs text-light-grey hover:text-black"
+            className="mb-2"
           >
             ← Back to Customers
-          </button>
+          </Button>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold text-black">{displayName}</h1>
             {user.disabled ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-soft-grey px-2.5 py-1 text-xs font-medium text-light-grey">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-200 px-2.5 py-1 text-xs font-medium text-light-grey">
                 <span className="h-1.5 w-1.5 rounded-full bg-light-grey" />
                 Disabled
               </span>
@@ -232,12 +257,12 @@ export default function UserDetailPage() {
           </div>
           <p className="mt-1 font-mono text-sm text-light-grey">{user.email ?? "—"}</p>
         </div>
-        <button
+        <Button
+          variant="outline"
           onClick={openEdit}
-          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-black transition-colors hover:border-primary hover:text-primary"
         >
           Edit
-        </button>
+        </Button>
       </div>
 
       {/* Cards */}
@@ -291,10 +316,16 @@ export default function UserDetailPage() {
         <InfoCard
           title="Preferences"
           rows={[
-            { label: "Preferred Store", value: user.preferredStoreName ?? user.preferredStoreId ?? "—" },
+            { label: "Preferred Store", value: preferredStoreLabel },
             { label: "Purchase Info by Mail", value: formatBool(user.getPurchaseInfoByMail) },
             { label: "Get Promotions", value: formatBool(user.getPromotions) },
             { label: "Allow Win a Coffee", value: formatBool(user.allowWinACoffee) },
+            { label: "Schedule Order", value: formatBool(user.scheduleOrder) },
+            { label: "Share Credit", value: formatBool(user.shareCredit) },
+            { label: "Withdraw Balance", value: formatBool(user.withdrawBalance) },
+            { label: "Coffix Credit Available", value: formatBool(user.coffixCreditAvailable) },
+            { label: "Allow Coffee for Home", value: formatBool(user.allowCoffeeForHome) },
+            { label: "Allow Notifications", value: formatBool(user.allowNotifications) },
           ]}
         />
 
@@ -420,7 +451,7 @@ export default function UserDetailPage() {
                 </div>
                 <div>
                   <label className={`mb-1.5 block text-xs ${errors.appVersion ? "text-red-500" : "text-light-grey"}`}>
-                    App Version {errors.appVersion && <span className="text-red-500">— must be x.x.x+x</span>}
+                    App Version {errors.appVersion && <span className="text-red-500">— must start with x.x.x</span>}
                   </label>
                   <input
                     className={`w-full rounded-lg border px-3 py-2 text-sm text-black outline-none focus:border-primary font-mono ${errors.appVersion ? "border-red-400" : "border-border"}`}
@@ -461,56 +492,34 @@ export default function UserDetailPage() {
                       { key: "getPromotions", label: "Get Promotions" },
                       { key: "allowWinACoffee", label: "Allow Win a Coffee" },
                       { key: "disabled", label: "Disabled" },
+                      { key: "scheduleOrder", label: "Schedule Order" },
+                      { key: "shareCredit", label: "Share Credit" },
+                      { key: "withdrawBalance", label: "Withdraw Balance" },
+                      { key: "coffixCreditAvailable", label: "Coffix Credit Available" },
+                      { key: "allowCoffeeForHome", label: "Allow Coffee for Home" },
+                      { key: "allowNotifications", label: "Allow Notifications" },
                     ] as { key: keyof UserEditForm; label: string }[]
                   ).map(({ key, label }) => (
                     <label key={key} className="flex cursor-pointer items-center justify-between px-3 py-2.5 hover:bg-[#fafafa]">
                       <span className="text-sm text-black">{label}</span>
-                      <input
-                        type="checkbox"
+                      <Switch
                         checked={form[key] as boolean}
-                        onChange={(e) => setField(key, e.target.checked)}
-                        className="accent-primary"
+                        onCheckedChange={(checked) => setField(key, checked)}
                       />
                     </label>
                   ))}
                 </div>
               </div>
-
-              {/* Read-only fields */}
-              <div>
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-light-grey">Read-only</p>
-                <div className="space-y-2 rounded-lg border border-border bg-[#fafafa] px-3 py-2">
-                  {[
-                    { label: "Email", value: user.email ?? "—" },
-                    { label: "Doc ID", value: user.docId ?? "—" },
-                    { label: "FCM Token", value: user.fcmToken ?? "—" },
-                    { label: "Email Verified", value: formatBool(user.emailVerified) },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="flex items-center justify-between gap-4">
-                      <span className="shrink-0 text-xs text-light-grey">{label}</span>
-                      <span className="truncate font-mono text-xs text-black" title={value}>{value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
             </div>
 
             {/* Dialog footer */}
             <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-              <button
-                onClick={closeDialog}
-                className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-[#f0f0f0]"
-              >
+              <Button variant="outline" onClick={closeDialog}>
                 Cancel
-              </button>
-              <button
-                onClick={handleUpdate}
-                disabled={loading}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50"
-              >
+              </Button>
+              <Button onClick={handleUpdate} disabled={loading}>
                 {loading ? "Saving…" : "Save Changes"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

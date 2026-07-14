@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type PageState = "verifying" | "invalid" | "form" | "submitting";
 
@@ -195,13 +196,12 @@ function ResetPasswordContent() {
               {fieldError && (
                 <p className="text-xs text-[var(--error)]">{fieldError}</p>
               )}
-              <button
+              <Button
                 type="submit"
                 disabled={state === "submitting"}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 {state === "submitting" ? "Updating…" : "Update password"}
-              </button>
+              </Button>
             </form>
           </>
         )}

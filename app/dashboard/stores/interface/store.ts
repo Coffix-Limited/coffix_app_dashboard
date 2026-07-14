@@ -24,6 +24,7 @@ export interface Store {
   email?: string;
   contactNumber?: string;
   printerId?: string;
+  city?: string | null;
 }
 
 export function isStoreOpenAt(store: Store, dt: Date = new Date()): boolean {

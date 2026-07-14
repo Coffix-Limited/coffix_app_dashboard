@@ -10,14 +10,16 @@ interface AuthContextValue {
   user: User | null;
   currentStaff: Staff | null;
   loading: boolean;
+  staffLoading: boolean;
 }
 
-const AuthContext = createContext<AuthContextValue>({ user: null, currentStaff: null, loading: true });
+const AuthContext = createContext<AuthContextValue>({ user: null, currentStaff: null, loading: true, staffLoading: true });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [currentStaff, setCurrentStaff] = useState<Staff | null>(null);
   const [loading, setLoading] = useState(true);
+  const [staffLoading, setStaffLoading] = useState(true);
   const staffUnsubRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -29,11 +31,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       staffUnsubRef.current = null;
 
       if (firebaseUser) {
+        setStaffLoading(true);
         staffUnsubRef.current = onSnapshot(doc(db, "staffs", firebaseUser.uid), (snap) => {
           setCurrentStaff(snap.exists() ? ({ ...snap.data(), docId: snap.id } as Staff) : null);
+          setStaffLoading(false);
         });
       } else {
         setCurrentStaff(null);
+        setStaffLoading(false);
       }
     });
 
@@ -44,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, currentStaff, loading }}>
+    <AuthContext.Provider value={{ user, currentStaff, loading, staffLoading }}>
       {children}
     </AuthContext.Provider>
   );

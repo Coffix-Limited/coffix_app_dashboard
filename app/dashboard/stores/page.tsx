@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Image from "next/image";
 import { useStoreStore } from "./store/useStoreStore";
+import { useAuth } from "@/app/lib/AuthContext";
 import { isStoreOpenAt, DayHours } from "./interface/store";
 import { StoreService } from "./service/StoreService";
 import {
@@ -13,6 +14,8 @@ import {
 } from "./constants/storeFieldConstants";
 import { escapeCSV, parseCSVText, triggerCSVDownload } from "@/app/utils/csvUtils";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { EnumChip } from "@/components/ui/StatusChip";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +24,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { StoresFilterBar } from "./components/StoresFilterBar";
+import { ImageUploadField } from "@/components/components/ImageUploadField";
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
 type Day = typeof DAYS[number];
@@ -37,6 +41,7 @@ type StoreForm = {
   contactNumber: string;
   location: string;
   address: string;
+  city: string;
   imageUrl: string;
   gstNumber: string;
   invoiceText: string;
@@ -52,6 +57,7 @@ const emptyForm: StoreForm = {
   contactNumber: "",
   location: "",
   address: "",
+  city: "",
   imageUrl: "",
   gstNumber: "",
   invoiceText: "",
@@ -60,12 +66,23 @@ const emptyForm: StoreForm = {
 };
 
 const REQUIRED: (keyof Omit<StoreForm, "openingHours">)[] = [
-  "name", "email", "contactNumber", "location", "address",
+  "name", "email", "contactNumber", "location", "address", "printerId",
+  "gstNumber", "invoiceText",
 ];
 
 export default function StoresPage() {
-  const stores = useStoreStore((s) => s.stores);
+  const allStores = useStoreStore((s) => s.stores);
   const router = useRouter();
+
+  const { currentStaff } = useAuth();
+  const isAdmin = currentStaff?.role === "admin";
+
+  // Store managers only see the stores they're assigned to.
+  const stores = useMemo(() => {
+    if (isAdmin) return allStores;
+    const myStoreIds = currentStaff?.storeIds ?? [];
+    return allStores.filter((s) => myStoreIds.includes(s.docId));
+  }, [allStores, isAdmin, currentStaff?.storeIds]);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"All" | "Open" | "Closed" | "Disabled">("All");
@@ -150,6 +167,9 @@ export default function StoresPage() {
   }, [stores, search, statusFilter, sortKey, sortDir,
       filterEmail, filterContactNumber, filterLocation,
       filterAddress, filterStoreCode, filterPrinterId]);
+
+  const [deleteStoreId, setDeleteStoreId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<StoreForm>(emptyForm);
@@ -297,6 +317,21 @@ export default function StoresPage() {
     }
   }
 
+  async function handleDeleteStore() {
+    if (!deleteStoreId) return;
+    setDeleteLoading(true);
+    try {
+      await StoreService.deleteStore(deleteStoreId);
+      toast.success("Store deleted.");
+      setDeleteStoreId(null);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete store. Please try again.");
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
   async function handleCreate() {
     const newErrors = Object.fromEntries(
       REQUIRED.map((k) => [k, !(form[k] as string).trim()]),
@@ -324,10 +359,11 @@ export default function StoresPage() {
         contactNumber: form.contactNumber.trim(),
         location: form.location.trim(),
         address: form.address.trim(),
+        city: form.city.trim() || null,
         imageUrl: form.imageUrl.trim() || null,
-        gstNumber: form.gstNumber.trim() || null,
-        invoiceText: form.invoiceText.trim() || null,
-        printerId: form.printerId.trim() || undefined,
+        gstNumber: form.gstNumber.trim(),
+        invoiceText: form.invoiceText.trim(),
+        printerId: form.printerId.trim(),
         openingHours,
         disable: false,
       });
@@ -366,19 +402,23 @@ export default function StoresPage() {
           >
             {importLoading ? "Importing…" : "Import CSV"}
           </Button> */}
-          <Button
-            variant="outline"
-            onClick={exportToCSV}
-            disabled={displayed.length === 0}
-          >
-            Export CSV
-          </Button>
-          <Button
-            onClick={() => setShowCreate(true)}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
-          >
-            + New Store
-          </Button>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              onClick={exportToCSV}
+              disabled={displayed.length === 0}
+            >
+              Export CSV
+            </Button>
+          )}
+          {isAdmin && (
+            <Button
+              onClick={() => setShowCreate(true)}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
+            >
+              + New Store
+            </Button>
+          )}
         </div>
       </div>
 
@@ -414,12 +454,13 @@ export default function StoresPage() {
                 Status {sortKey === "status" ? (sortDir === "asc" ? "↑" : "↓") : <span className="opacity-30">↕</span>}
               </th>
               <th className="px-5 py-3 text-left font-medium text-light-grey">Disabled</th>
+              <th className="px-5 py-3 text-left font-medium text-light-grey">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {displayed.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-5 py-10 text-center text-light-grey">
+                <td colSpan={6} className="px-5 py-10 text-center text-light-grey">
                   No stores found.
                 </td>
               </tr>
@@ -460,23 +501,37 @@ export default function StoresPage() {
                     </td>
                     <td className="px-5 py-3 text-black">{store.printerId ?? "—"}</td>
                     <td className="px-5 py-3">
-                      <Button
-                        size="xs"
-                        variant={isDisabled ? "secondary" : isOpen ? "solid-success" : "destructive"}
-                        className="rounded-full pointer-events-none"
-                      >
-                        {isDisabled ? "Disabled" : isOpen ? "Open" : "Closed"}
-                      </Button>
+                      <EnumChip
+                        domain="storeStatus"
+                        value={isDisabled ? "Disabled" : isOpen ? "Open" : "Closed"}
+                      />
                     </td>
                     <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        size="xs"
-                        variant={isDisabled ? "solid-error" : "solid-success"}
-                        onClick={() => StoreService.updateStore(store.docId, { disable: !isDisabled })}
-                        className="rounded-full"
-                      >
-                        {isDisabled ? "Disabled" : "Enabled"}
-                      </Button>
+                      {isAdmin ? (
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={!isDisabled}
+                            onCheckedChange={(checked) =>
+                              StoreService.updateStore(store.docId, { disable: !checked })
+                            }
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-sm text-light-grey">{isDisabled ? "Disabled" : "Enabled"}</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
+                      {isAdmin ? (
+                        <Button
+                          size="xs"
+                          variant="destructive"
+                          onClick={() => setDeleteStoreId(store.docId)}
+                        >
+                          Delete
+                        </Button>
+                      ) : (
+                        <span className="text-sm text-light-grey">—</span>
+                      )}
                     </td>
                   </tr>
                 );
@@ -514,15 +569,10 @@ export default function StoresPage() {
                   {errors.name && <p className="mt-1 text-xs text-error">Name is required.</p>}
                 </div>
 
-                <div>
-                  <label className="mb-1.5 block text-xs text-light-grey">Image URL</label>
-                  <input
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
-                    placeholder="https://..."
-                    value={form.imageUrl}
-                    onChange={(e) => setField("imageUrl", e.target.value)}
-                  />
-                </div>
+                <ImageUploadField
+                  value={form.imageUrl}
+                  onChange={(url) => setField("imageUrl", url)}
+                />
 
                 <div>
                   <label className="mb-1.5 block text-xs text-light-grey">Email *</label>
@@ -571,44 +621,44 @@ export default function StoresPage() {
                 </div>
 
                 <div className="col-span-2">
-                  <label className="mb-1.5 block text-xs text-light-grey">Address *</label>
+                  <label className="mb-1.5 block text-xs text-light-grey">City</label>
                   <input
-                    className={`w-full rounded-lg border px-3 py-2 text-sm text-black outline-none focus:border-primary ${errors.address ? "border-error" : "border-border"}`}
-                    placeholder="e.g. TUR, AUK"
-                    value={form.address}
-                    onChange={(e) => setField("address", e.target.value)}
+                    className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
+                    placeholder="e.g. Makati"
+                    value={form.city}
+                    onChange={(e) => setField("city", e.target.value)}
                   />
-                  {errors.address && <p className="mt-1 text-xs text-error">Required.</p>}
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs text-light-grey">GST Number</label>
+                  <label className="mb-1.5 block text-xs text-light-grey">GST Number *</label>
                   <input
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
-                    placeholder="Optional"
+                    className={`w-full rounded-lg border px-3 py-2 text-sm text-black outline-none focus:border-primary ${errors.gstNumber ? "border-error" : "border-border"}`}
                     value={form.gstNumber}
                     onChange={(e) => setField("gstNumber", e.target.value)}
                   />
+                  {errors.gstNumber && <p className="mt-1 text-xs text-error">Required.</p>}
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs text-light-grey">Invoice Text</label>
+                  <label className="mb-1.5 block text-xs text-light-grey">Invoice Text *</label>
                   <input
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
-                    placeholder="Optional"
+                    className={`w-full rounded-lg border px-3 py-2 text-sm text-black outline-none focus:border-primary ${errors.invoiceText ? "border-error" : "border-border"}`}
                     value={form.invoiceText}
                     onChange={(e) => setField("invoiceText", e.target.value)}
                   />
+                  {errors.invoiceText && <p className="mt-1 text-xs text-error">Required.</p>}
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs text-light-grey">Printer ID</label>
+                  <label className="mb-1.5 block text-xs text-light-grey">Printer ID *</label>
                   <input
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm text-black outline-none focus:border-primary"
-                    placeholder="Optional"
+                    className={`w-full rounded-lg border px-3 py-2 text-sm text-black outline-none focus:border-primary ${errors.printerId ? "border-error" : "border-border"}`}
                     value={form.printerId}
                     onChange={(e) => setField("printerId", e.target.value)}
+                    placeholder="UAT"
                   />
+                  {errors.printerId && <p className="mt-1 text-xs text-error">Required.</p>}
                 </div>
               </div>
 
@@ -655,23 +705,46 @@ export default function StoresPage() {
             </div>
 
             <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-              <button
+              <Button
+                variant="outline"
                 onClick={closeDialog}
-                className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-soft-grey"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleCreate}
                 disabled={loading}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50"
               >
                 {loading ? "Creating…" : "Create Store"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Delete Store Confirmation Dialog */}
+      <Dialog open={deleteStoreId !== null} onOpenChange={(open) => { if (!open) setDeleteStoreId(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Store</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-black">
+            Are you sure you want to delete{" "}
+            <span className="font-medium">
+              {stores.find((s) => s.docId === deleteStoreId)?.name ?? "this store"}
+            </span>
+            ? This action cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteStoreId(null)} disabled={deleteLoading}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteStore} disabled={deleteLoading}>
+              {deleteLoading ? "Deleting…" : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* CSV Field Guide Dialog */}
       <Dialog open={showImportInfo} onOpenChange={setShowImportInfo}>

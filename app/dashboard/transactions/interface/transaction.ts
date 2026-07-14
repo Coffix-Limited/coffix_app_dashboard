@@ -4,12 +4,17 @@ export type TransactionStatus =
   | 'failed'
   | 'approved'
   | 'declined'
-  | 'completed';
+  | 'completed'
+  | 'claimed'
+  | 'pending'
+  | 'sent'
+  | 'expired';
 
 export type PaymentMethod =
   | 'coffixCredit'
   | 'card'
-  | 'wallet';
+  | 'wallet'
+  | 'cash';
 
 export interface Transaction {
   docId?: string | null;
@@ -30,9 +35,16 @@ export interface Transaction {
   senderLastName?: string | null;
   transactionNumber?: string | null;
   totalAmount?: number | null;
+  sessionId?: string | null;
 
   // GST fields
   gst?: number | null;
   gstAmount?: number | null;
   gstNumber?: number | null;
+
+  originalTransactionNumber?: string | null;
+  couponDiscount?: number | null;
+  couponIds?: string[];
+  notes?: string;
+  isManual?: boolean;
 }

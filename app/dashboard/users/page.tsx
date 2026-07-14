@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useUserStore } from "./store/useUserStore";
 import { useStoreStore } from "@/app/dashboard/stores/store/useStoreStore";
+import { useTransactionStore } from "@/app/dashboard/transactions/store/useTransactionStore";
+import { accumulateCoffixCredit, reconcileCoffixCredit, COFFIX_CREDIT_SIGN } from "@/app/utils/coffixCredit";
 import { UserService } from "./service/UserService";
+import { AppUser } from "./interface/user";
 import {
   USER_PROTECTED_FIELDS,
   USER_IMPORTABLE_FIELDS,
@@ -20,6 +23,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { UsersFilterBar } from "./components/UsersFilterBar";
+import { AddCouponDialog } from "@/app/dashboard/coupons/components/AddCouponDialog";
+import BulkUpdateFlagsDialog, { type FlagKey } from "./components/BulkUpdateFlagsDialog";
 
 function dateInRange(value: Date | undefined, from: string, to: string): boolean {
   if (!from && !to) return true;
@@ -35,6 +40,32 @@ function dateInRange(value: Date | undefined, from: string, to: string): boolean
     if (d > toEnd) return false;
   }
   return true;
+}
+
+function toMillis(value: unknown): number {
+  if (value === undefined || value === null) return 0;
+  // Firestore Timestamp instance
+  if (typeof (value as { toDate?: () => Date }).toDate === "function") {
+    const t = (value as { toDate: () => Date }).toDate().getTime();
+    return isNaN(t) ? 0 : t;
+  }
+  // Real Date
+  if (value instanceof Date) {
+    const t = value.getTime();
+    return isNaN(t) ? 0 : t;
+  }
+  // Serialized Timestamp: { seconds, nanoseconds } or { _seconds, _nanoseconds }
+  if (typeof value === "object") {
+    const o = value as { seconds?: number; _seconds?: number };
+    const seconds = o.seconds ?? o._seconds;
+    if (typeof seconds === "number") return seconds * 1000;
+  }
+  // ISO string / number
+  if (typeof value === "string" || typeof value === "number") {
+    const t = new Date(value).getTime();
+    return isNaN(t) ? 0 : t;
+  }
+  return 0;
 }
 
 function getDisplayName(user: { firstName?: string; lastName?: string; nickName?: string }): string {
@@ -84,10 +115,33 @@ function IndeterminateCheckbox({
   );
 }
 
+const FLAG_KEYS: FlagKey[] = [
+  "getPurchaseInfoByMail", "getPromotions", "allowWinACoffee",
+  "disabled", "scheduleOrder", "shareCredit", "withdrawBalance", "coffixCreditAvailable",
+];
+
 export default function UsersPage() {
   const users = useUserStore((s) => s.users);
   const stores = useStoreStore((s) => s.stores);
+  const transactions = useTransactionStore((s) => s.transactions);
   const router = useRouter();
+
+  // Re-derive each user's coffix credit from their coffixCredit transactions once,
+  // so rows don't each re-scan the full transaction list.
+  const accumulatedByUser = useMemo(() => {
+    const userIds = new Set<string>();
+    for (const tx of transactions) {
+      const type = tx.type ?? "";
+      if (!COFFIX_CREDIT_SIGN[type] && type !== "gift") continue;
+      if (tx.customerId) userIds.add(tx.customerId);
+      if (tx.recipientCustomerId) userIds.add(tx.recipientCustomerId);
+    }
+    const map = new Map<string, number>();
+    for (const id of userIds) {
+      map.set(id, accumulateCoffixCredit(transactions, id));
+    }
+    return map;
+  }, [transactions]);
 
   type BoolFilter = "Any" | "Yes" | "No";
   type DateRange = { from: string; to: string };
@@ -116,9 +170,12 @@ export default function UsersPage() {
   const [filterAllowWinACoffee, setFilterAllowWinACoffee] = useState<BoolFilter>("Any");
   const [filterDisabled, setFilterDisabled] = useState<BoolFilter>("Any");
   const [filterCreditAvailable, setFilterCreditAvailable] = useState<NumberRange>({ min: "", max: "" });
+  const [filterBirthMonth, setFilterBirthMonth] = useState<string>("All");
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showAddCredits, setShowAddCredits] = useState(false);
+  const [showAddCoupon, setShowAddCoupon] = useState(false);
+  const [showBulkFlags, setShowBulkFlags] = useState(false);
   const [creditAmount, setCreditAmount] = useState("");
   const [creditLoading, setCreditLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
@@ -155,6 +212,7 @@ export default function UsersPage() {
     setFilterAllowWinACoffee("Any");
     setFilterDisabled("Any");
     setFilterCreditAvailable({ min: "", max: "" });
+    setFilterBirthMonth("All");
     clearSelection();
   }
 
@@ -183,13 +241,15 @@ export default function UsersPage() {
       filterGetPromotions !== "Any" ||
       filterAllowWinACoffee !== "Any" ||
       filterDisabled !== "Any" ||
-      filterCreditAvailable.min !== "" || filterCreditAvailable.max !== ""
+      filterCreditAvailable.min !== "" || filterCreditAvailable.max !== "" ||
+      filterBirthMonth !== "All"
     );
   }, [
     search, storeFilter, filterEmail, filterDocId, filterSuburb, filterCity,
     filterAppVersion, filterQrId, filterMobile, filterBirthday, filterCreatedAt,
     filterLastLogin, filterCreditExpiry, filterEmailVerified, filterGetPurchaseInfoByMail,
     filterGetPromotions, filterAllowWinACoffee, filterDisabled, filterCreditAvailable,
+    filterBirthMonth,
   ]);
 
   const filtered = useMemo(() => {
@@ -214,6 +274,13 @@ export default function UsersPage() {
       if (filterQrId.trim() && !(u.qrId ?? "").toLowerCase().includes(filterQrId.trim().toLowerCase())) return false;
       if (filterMobile.trim() && !(u.mobile ?? "").toLowerCase().includes(filterMobile.trim().toLowerCase())) return false;
       if (!dateInRange(u.birthday, filterBirthday.from, filterBirthday.to)) return false;
+      if (filterBirthMonth !== "All") {
+        if (!u.birthday) return false;
+        const bd = typeof (u.birthday as unknown as { toDate?: () => Date }).toDate === "function"
+          ? (u.birthday as unknown as { toDate: () => Date }).toDate()
+          : (u.birthday as Date);
+        if (bd.getMonth() + 1 !== Number(filterBirthMonth)) return false;
+      }
       if (!dateInRange(u.createdAt, filterCreatedAt.from, filterCreatedAt.to)) return false;
       if (!dateInRange(u.lastLogin, filterLastLogin.from, filterLastLogin.to)) return false;
       if (!dateInRange(u.creditExpiry, filterCreditExpiry.from, filterCreditExpiry.to)) return false;
@@ -233,6 +300,9 @@ export default function UsersPage() {
       return true;
     });
     result = [...result].sort((a, b) => {
+      const aTime = toMillis(a.createdAt);
+      const bTime = toMillis(b.createdAt);
+      if (bTime !== aTime) return bTime - aTime;
       const cmp = getDisplayName(a).localeCompare(getDisplayName(b));
       return sortDir === "asc" ? cmp : -cmp;
     });
@@ -243,7 +313,21 @@ export default function UsersPage() {
     filterQrId, filterMobile, filterBirthday, filterCreatedAt, filterLastLogin,
     filterCreditExpiry, filterEmailVerified, filterGetPurchaseInfoByMail,
     filterGetPromotions, filterAllowWinACoffee, filterDisabled, filterCreditAvailable,
+    filterBirthMonth,
   ]);
+
+  const bulkInitialFlags = useMemo(() => {
+    const selected = Array.from(selectedIds)
+      .map((id) => users.find((u) => u.docId === id))
+      .filter(Boolean) as AppUser[];
+    if (selected.length === 0) return {} as Partial<Record<FlagKey, boolean>>;
+    const result: Partial<Record<FlagKey, boolean>> = {};
+    for (const key of FLAG_KEYS) {
+      const trueCount = selected.filter((u) => u[key] === true).length;
+      result[key] = trueCount > selected.length / 2;
+    }
+    return result;
+  }, [selectedIds, users]);
 
   const allSelected = filtered.length > 0 && filtered.every((u) => selectedIds.has(u.docId!));
   const someSelected = !allSelected && filtered.some((u) => selectedIds.has(u.docId!));
@@ -395,6 +479,14 @@ export default function UsersPage() {
     }
   }
 
+  async function handleBulkUpdateFlags(flags: Partial<AppUser>) {
+    await Promise.all(
+      Array.from(selectedIds).map((docId) =>
+        UserService.updateUser(docId, flags)
+      )
+    );
+  }
+
   async function handleAddCredits() {
     const amount = parseFloat(creditAmount);
     if (isNaN(amount) || amount <= 0) {
@@ -425,9 +517,9 @@ export default function UsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-black">Users</h1>
+          <h1 className="text-2xl font-semibold text-black">Customers</h1>
           <p className="mt-1 text-sm text-light-grey">
-            {users.length} user{users.length !== 1 ? "s" : ""} total
+            {users.length} customer{users.length !== 1 ? "s" : ""} total
           </p>
         </div>
         <div className="flex gap-2">
@@ -468,6 +560,7 @@ export default function UsersPage() {
         storeFilter={storeFilter} setStoreFilter={setStoreFilterAndClear}
         stores={stores}
         filterBirthday={filterBirthday} setFilterBirthday={setFilterBirthday}
+        filterBirthMonth={filterBirthMonth} setFilterBirthMonth={setFilterBirthMonth}
         filterCreatedAt={filterCreatedAt} setFilterCreatedAt={setFilterCreatedAt}
         filterLastLogin={filterLastLogin} setFilterLastLogin={setFilterLastLogin}
         filterCreditExpiry={filterCreditExpiry} setFilterCreditExpiry={setFilterCreditExpiry}
@@ -492,6 +585,18 @@ export default function UsersPage() {
           </Button>
           <Button
             size="sm"
+            onClick={() => setShowAddCoupon(true)}
+          >
+            Add Coupon
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setShowBulkFlags(true)}
+          >
+            Update Flags
+          </Button>
+          <Button
+            size="sm"
             variant="ghost"
             onClick={clearSelection}
           >
@@ -501,7 +606,8 @@ export default function UsersPage() {
       )}
 
       <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
-        <table className="w-full table-fixed text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] table-fixed text-sm">
           <thead>
             <tr className="border-b border-border bg-background">
               <th className="w-10 px-5 py-3">
@@ -519,13 +625,15 @@ export default function UsersPage() {
               </th>
               <th className="px-5 py-3 text-left font-medium text-light-grey">Email</th>
               <th className="px-5 py-3 text-left font-medium text-light-grey">Preferred Store</th>
+              <th className="w-36 px-5 py-3 text-right font-medium text-light-grey">Coffix Credit</th>
+              <th className="w-36 px-5 py-3 text-right font-medium text-light-grey">Accumulated</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-5 py-10 text-center text-light-grey">
-                  No users found.
+                <td colSpan={6} className="px-5 py-10 text-center text-light-grey">
+                  No customers found.
                 </td>
               </tr>
             ) : (
@@ -533,6 +641,9 @@ export default function UsersPage() {
                 const displayName = getDisplayName(user);
                 const initials = getInitials(displayName);
                 const isSelected = selectedIds.has(user.docId!);
+                const currentCredit = user.creditAvailable ?? 0;
+                const accumulatedCredit = accumulatedByUser.get(user.docId!) ?? 0;
+                const reconciliation = reconcileCoffixCredit(currentCredit, accumulatedCredit);
                 return (
                   <tr
                     key={user.docId}
@@ -564,16 +675,26 @@ export default function UsersPage() {
                     </td>
                     <td className="truncate px-5 py-3 text-black">{user.email ?? "—"}</td>
                     <td className="truncate px-5 py-3 text-black">{getStoreName(user.preferredStoreId, stores)}</td>
+                    <td className="px-5 py-3 text-right text-black tabular-nums">
+                      ${currentCredit.toFixed(2)}
+                    </td>
+                    <td
+                      className={`px-5 py-3 text-right tabular-nums ${reconciliation.matches ? "text-black" : "font-medium text-red-600"}`}
+                    >
+                      ${accumulatedCredit.toFixed(2)}
+                      {!reconciliation.matches && <span className="ml-1">⚠</span>}
+                    </td>
                   </tr>
                 );
               })
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       <Dialog open={showAddCredits} onOpenChange={(open) => { if (!open) { setShowAddCredits(false); setCreditAmount(""); } }}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Add Credits</DialogTitle>
           </DialogHeader>
@@ -609,7 +730,7 @@ export default function UsersPage() {
       <Dialog open={showImportInfo} onOpenChange={setShowImportInfo}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>CSV Import Guide — Users</DialogTitle>
+            <DialogTitle>CSV Import Guide — Customers</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2 text-sm">
             <div className="space-y-1.5">
@@ -672,6 +793,23 @@ export default function UsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AddCouponDialog
+        open={showAddCoupon}
+        onClose={() => setShowAddCoupon(false)}
+        stores={stores}
+        userIds={Array.from(selectedIds)}
+        defaultEmails={Array.from(selectedIds).map((id) => users.find((u) => u.docId === id)?.email ?? "").filter(Boolean)}
+      />
+
+      <BulkUpdateFlagsDialog
+        key={showBulkFlags ? "open" : "closed"}
+        open={showBulkFlags}
+        onClose={() => setShowBulkFlags(false)}
+        selectedCount={selectedIds.size}
+        initialFlags={bulkInitialFlags}
+        onSave={handleBulkUpdateFlags}
+      />
     </div>
   );
 }

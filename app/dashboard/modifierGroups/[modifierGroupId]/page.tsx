@@ -7,6 +7,7 @@ import { useDashboardStore } from "../../products/store/useDashboardStore";
 import { Modifier } from "../../products/interface/modifier";
 import { ProductService } from "../../products/service/ProductService";
 import { formatCurrencyInput } from "@/app/utils/formatting";
+import { Button } from "@/components/ui/button";
 
 type DialogMode = "edit-group" | "delete-group" | "add-modifier" | "edit-modifier" | "delete-modifier" | null;
 
@@ -25,6 +26,7 @@ export default function ModifierGroupDetailPage() {
 
   const modifierGroups = useDashboardStore((s) => s.modifierGroups);
   const modifiers = useDashboardStore((s) => s.modifiers);
+  const products = useDashboardStore((s) => s.products);
 
   const [dialog, setDialog] = useState<DialogMode>(null);
   const [groupForm, setGroupForm] = useState({ name: "", required: false });
@@ -36,6 +38,9 @@ export default function ModifierGroupDetailPage() {
   const dragIndex = useRef<number | null>(null);
 
   const group = modifierGroups.find((g) => g.docId === modifierGroupId);
+  const productsUsingGroup = products.filter((p) =>
+    p.modifierGroupIds?.includes(modifierGroupId ?? ""),
+  );
 
   useEffect(() => {
     if (!group) return;
@@ -117,8 +122,12 @@ export default function ModifierGroupDetailPage() {
     if (!group?.docId) return;
     setLoading(true);
     try {
-      await ProductService.deleteModifierGroup(group.docId);
-      toast.success("Modifier group deleted.");
+      await ProductService.deleteModifierGroupCascade(
+        group.docId,
+        group.modifierIds ?? [],
+        productsUsingGroup.map((p) => p.docId).filter((id): id is string => !!id),
+      );
+      toast.success("Modifier group and its modifiers deleted.");
       router.push("/dashboard/modifierGroups");
     } catch (err) {
       console.error(err);
@@ -204,28 +213,24 @@ export default function ModifierGroupDetailPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => router.push("/dashboard/modifierGroups")}
-            className="mb-2 text-xs text-light-grey hover:text-black"
+            className="mb-2"
           >
             ← Back to Modifier Groups
-          </button>
+          </Button>
           <h1 className="text-2xl font-semibold text-black">{group.name ?? "—"}</h1>
           <p className="mt-1 text-sm text-light-grey">{group.required ? "Required" : "Optional"}</p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={openEditGroup}
-            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-black transition-colors hover:border-primary hover:text-primary"
-          >
+          <Button variant="outline" onClick={openEditGroup}>
             Edit
-          </button>
-          <button
-            onClick={() => setDialog("delete-group")}
-            className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
-          >
+          </Button>
+          <Button variant="solid-error" onClick={() => setDialog("delete-group")}>
             Delete
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -234,12 +239,9 @@ export default function ModifierGroupDetailPage() {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-black">Modifiers</h2>
-          <button
-            onClick={openAddModifier}
-            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-80"
-          >
+          <Button  onClick={openAddModifier}>
             + Add Modifier
-          </button>
+          </Button>
         </div>
 
         <div className="overflow-hidden rounded-xl border border-border bg-white shadow-(--shadow)">
@@ -269,7 +271,8 @@ export default function ModifierGroupDetailPage() {
                     onDragStart={() => { dragIndex.current = i; }}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => handleDrop(i)}
-                    className="transition-colors hover:bg-background"
+                    onClick={() => openEditModifier(m)}
+                    className="cursor-pointer transition-colors hover:bg-background"
                   >
                     <td className="px-3 py-3">
                       <svg className="h-4 w-4 shrink-0 cursor-grab text-light-grey active:cursor-grabbing" viewBox="0 0 16 16" fill="currentColor">
@@ -296,19 +299,11 @@ export default function ModifierGroupDetailPage() {
                       )}
                     </td>
                     <td className="px-5 py-3 text-right">
-                      <div className="inline-flex gap-2">
-                        <button
-                          onClick={() => openEditModifier(m)}
-                          className="text-xs text-black hover:text-primary"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => openDeleteModifier(m)}
-                          className="text-xs text-error hover:opacity-70"
-                        >
+                      <div className="inline-flex">
+                     
+                        <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); openDeleteModifier(m); }}>
                           Delete
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -354,10 +349,10 @@ export default function ModifierGroupDetailPage() {
                   </label>
                 </div>
                 <div className="mt-5 flex justify-end gap-2">
-                  <button onClick={() => setDialog(null)} className="rounded-lg border border-border px-4 py-2 text-sm text-black ">Cancel</button>
-                  <button onClick={handleUpdateGroup} disabled={loading} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50">
+                  <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
+                  <Button onClick={handleUpdateGroup} disabled={loading}>
                     {loading ? "Saving…" : "Save"}
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
@@ -367,13 +362,26 @@ export default function ModifierGroupDetailPage() {
               <>
                 <h3 className="mb-2 text-lg font-semibold text-black">Delete Modifier Group</h3>
                 <p className="text-sm text-light-grey">
-                  Are you sure you want to delete <strong className="text-black">{group.name}</strong>? This cannot be undone.
+                  Are you sure you want to delete <strong className="text-black">{group.name}</strong>? Its modifiers will be deleted too. This cannot be undone.
                 </p>
+                {productsUsingGroup.length > 0 && (
+                  <div className="mt-3 rounded-lg border border-error/30 bg-error/5 px-3 py-2.5">
+                    <p className="text-xs font-medium text-error">
+                      ⚠ Used by {productsUsingGroup.length} product
+                      {productsUsingGroup.length !== 1 ? "s" : ""}
+                    </p>
+                    <p className="mt-1 text-xs text-light-grey">
+                      This group will be removed from{" "}
+                      {productsUsingGroup.slice(0, 5).map((p) => p.name ?? "Unnamed").join(", ")}
+                      {productsUsingGroup.length > 5 ? `, +${productsUsingGroup.length - 5} more` : ""}.
+                    </p>
+                  </div>
+                )}
                 <div className="mt-5 flex justify-end gap-2">
-                  <button onClick={() => setDialog(null)} className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-soft-grey">Cancel</button>
-                  <button onClick={handleDeleteGroup} disabled={loading} className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50">
+                  <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
+                  <Button variant="solid-error" onClick={handleDeleteGroup} disabled={loading}>
                     {loading ? "Deleting…" : "Delete"}
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
@@ -432,10 +440,10 @@ export default function ModifierGroupDetailPage() {
                   </label>
                 </div>
                 <div className="mt-5 flex justify-end gap-2">
-                  <button onClick={() => setDialog(null)} className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-grey">Cancel</button>
-                  <button onClick={handleSaveModifier} disabled={loading} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50">
+                  <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
+                  <Button onClick={handleSaveModifier} disabled={loading}>
                     {loading ? "Saving…" : "Save"}
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
@@ -446,10 +454,10 @@ export default function ModifierGroupDetailPage() {
                 <h3 className="mb-2 text-lg font-semibold text-black">Delete Modifier</h3>
                 <p className="text-sm text-light-grey">Are you sure you want to delete this modifier? This cannot be undone.</p>
                 <div className="mt-5 flex justify-end gap-2">
-                  <button onClick={() => setDialog(null)} className="rounded-lg border border-border px-4 py-2 text-sm text-black hover:bg-soft-grey">Cancel</button>
-                  <button onClick={handleDeleteModifier} disabled={loading} className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50">
+                  <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
+                  <Button variant="solid-error" onClick={handleDeleteModifier} disabled={loading}>
                     {loading ? "Deleting…" : "Delete"}
-                  </button>
+                  </Button>
                 </div>
               </>
             )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { DateInput } from "@/components/ui/DateInput";
 
 type BoolFilter = "Any" | "Yes" | "No";
 type DateRange = { from: string; to: string };
@@ -18,6 +19,7 @@ interface UsersFilterBarProps {
   storeFilter: string; setStoreFilter: (v: string) => void;
   stores: { docId: string; name?: string }[];
   filterBirthday: DateRange; setFilterBirthday: (v: DateRange | ((p: DateRange) => DateRange)) => void;
+  filterBirthMonth: string; setFilterBirthMonth: (v: string) => void;
   filterCreatedAt: DateRange; setFilterCreatedAt: (v: DateRange | ((p: DateRange) => DateRange)) => void;
   filterLastLogin: DateRange; setFilterLastLogin: (v: DateRange | ((p: DateRange) => DateRange)) => void;
   filterCreditExpiry: DateRange; setFilterCreditExpiry: (v: DateRange | ((p: DateRange) => DateRange)) => void;
@@ -43,6 +45,7 @@ export function UsersFilterBar({
   storeFilter, setStoreFilter,
   stores,
   filterBirthday, setFilterBirthday,
+  filterBirthMonth, setFilterBirthMonth,
   filterCreatedAt, setFilterCreatedAt,
   filterLastLogin, setFilterLastLogin,
   filterCreditExpiry, setFilterCreditExpiry,
@@ -172,25 +175,55 @@ export function UsersFilterBar({
         <div className={`flex flex-col gap-1 rounded-lg border bg-white px-3 py-1.5 min-w-[260px] ${filterBirthday.from || filterBirthday.to ? "border-primary" : "border-border"}`}>
           <span className="flex items-center justify-between text-[10px] font-medium uppercase tracking-wide text-light-grey">
             Birthday
-            {(filterBirthday.from || filterBirthday.to) && <button onClick={() => setFilterBirthday({ from: "", to: "" })} className="ml-1 text-light-grey hover:text-black">×</button>}
+            {(filterBirthday.from || filterBirthday.to) && (
+              <button onClick={() => setFilterBirthday({ from: "", to: "" })} className="ml-1 text-light-grey hover:text-black">×</button>
+            )}
           </span>
           <div className="flex items-center gap-1">
-            <input type="date" value={filterBirthday.from} onChange={(e) => setFilterBirthday((p) => ({ ...p, from: e.target.value }))} className="h-7 w-full bg-transparent text-sm text-black outline-none" />
+            <DateInput value={filterBirthday.from} onChange={(v) => setFilterBirthday((p) => ({ ...p, from: v }))} />
             <span className="shrink-0 text-xs text-light-grey">–</span>
-            <input type="date" value={filterBirthday.to} onChange={(e) => setFilterBirthday((p) => ({ ...p, to: e.target.value }))} className="h-7 w-full bg-transparent text-sm text-black outline-none" />
+            <DateInput value={filterBirthday.to} onChange={(v) => setFilterBirthday((p) => ({ ...p, to: v }))} />
           </div>
+        </div>
+
+        {/* Birth Month */}
+        <div className={`flex flex-col gap-1 rounded-lg border bg-white px-3 py-1.5 min-w-[150px] ${filterBirthMonth !== "All" ? "border-primary" : "border-border"}`}>
+          <span className="flex items-center justify-between text-[10px] font-medium uppercase tracking-wide text-light-grey">
+            Birth Month
+            {filterBirthMonth !== "All" && <button onClick={() => setFilterBirthMonth("All")} className="ml-1 text-light-grey hover:text-black">×</button>}
+          </span>
+          <Select value={filterBirthMonth} onValueChange={(v) => setFilterBirthMonth(v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">All</SelectItem>
+              <SelectItem value="1">January</SelectItem>
+              <SelectItem value="2">February</SelectItem>
+              <SelectItem value="3">March</SelectItem>
+              <SelectItem value="4">April</SelectItem>
+              <SelectItem value="5">May</SelectItem>
+              <SelectItem value="6">June</SelectItem>
+              <SelectItem value="7">July</SelectItem>
+              <SelectItem value="8">August</SelectItem>
+              <SelectItem value="9">September</SelectItem>
+              <SelectItem value="10">October</SelectItem>
+              <SelectItem value="11">November</SelectItem>
+              <SelectItem value="12">December</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Created At */}
         <div className={`flex flex-col gap-1 rounded-lg border bg-white px-3 py-1.5 min-w-[260px] ${filterCreatedAt.from || filterCreatedAt.to ? "border-primary" : "border-border"}`}>
           <span className="flex items-center justify-between text-[10px] font-medium uppercase tracking-wide text-light-grey">
             Created At
-            {(filterCreatedAt.from || filterCreatedAt.to) && <button onClick={() => setFilterCreatedAt({ from: "", to: "" })} className="ml-1 text-light-grey hover:text-black">×</button>}
+            {(filterCreatedAt.from || filterCreatedAt.to) && (
+              <button onClick={() => setFilterCreatedAt({ from: "", to: "" })} className="ml-1 text-light-grey hover:text-black">×</button>
+            )}
           </span>
           <div className="flex items-center gap-1">
-            <input type="date" value={filterCreatedAt.from} onChange={(e) => setFilterCreatedAt((p) => ({ ...p, from: e.target.value }))} className="h-7 w-full bg-transparent text-sm text-black outline-none" />
+            <DateInput value={filterCreatedAt.from} onChange={(v) => setFilterCreatedAt((p) => ({ ...p, from: v }))} />
             <span className="shrink-0 text-xs text-light-grey">–</span>
-            <input type="date" value={filterCreatedAt.to} onChange={(e) => setFilterCreatedAt((p) => ({ ...p, to: e.target.value }))} className="h-7 w-full bg-transparent text-sm text-black outline-none" />
+            <DateInput value={filterCreatedAt.to} onChange={(v) => setFilterCreatedAt((p) => ({ ...p, to: v }))} />
           </div>
         </div>
 
@@ -198,12 +231,14 @@ export function UsersFilterBar({
         <div className={`flex flex-col gap-1 rounded-lg border bg-white px-3 py-1.5 min-w-[260px] ${filterLastLogin.from || filterLastLogin.to ? "border-primary" : "border-border"}`}>
           <span className="flex items-center justify-between text-[10px] font-medium uppercase tracking-wide text-light-grey">
             Last Login
-            {(filterLastLogin.from || filterLastLogin.to) && <button onClick={() => setFilterLastLogin({ from: "", to: "" })} className="ml-1 text-light-grey hover:text-black">×</button>}
+            {(filterLastLogin.from || filterLastLogin.to) && (
+              <button onClick={() => setFilterLastLogin({ from: "", to: "" })} className="ml-1 text-light-grey hover:text-black">×</button>
+            )}
           </span>
           <div className="flex items-center gap-1">
-            <input type="date" value={filterLastLogin.from} onChange={(e) => setFilterLastLogin((p) => ({ ...p, from: e.target.value }))} className="h-7 w-full bg-transparent text-sm text-black outline-none" />
+            <DateInput value={filterLastLogin.from} onChange={(v) => setFilterLastLogin((p) => ({ ...p, from: v }))} />
             <span className="shrink-0 text-xs text-light-grey">–</span>
-            <input type="date" value={filterLastLogin.to} onChange={(e) => setFilterLastLogin((p) => ({ ...p, to: e.target.value }))} className="h-7 w-full bg-transparent text-sm text-black outline-none" />
+            <DateInput value={filterLastLogin.to} onChange={(v) => setFilterLastLogin((p) => ({ ...p, to: v }))} />
           </div>
         </div>
 
@@ -211,12 +246,14 @@ export function UsersFilterBar({
         <div className={`flex flex-col gap-1 rounded-lg border bg-white px-3 py-1.5 min-w-[260px] ${filterCreditExpiry.from || filterCreditExpiry.to ? "border-primary" : "border-border"}`}>
           <span className="flex items-center justify-between text-[10px] font-medium uppercase tracking-wide text-light-grey">
             Credit Expiry
-            {(filterCreditExpiry.from || filterCreditExpiry.to) && <button onClick={() => setFilterCreditExpiry({ from: "", to: "" })} className="ml-1 text-light-grey hover:text-black">×</button>}
+            {(filterCreditExpiry.from || filterCreditExpiry.to) && (
+              <button onClick={() => setFilterCreditExpiry({ from: "", to: "" })} className="ml-1 text-light-grey hover:text-black">×</button>
+            )}
           </span>
           <div className="flex items-center gap-1">
-            <input type="date" value={filterCreditExpiry.from} onChange={(e) => setFilterCreditExpiry((p) => ({ ...p, from: e.target.value }))} className="h-7 w-full bg-transparent text-sm text-black outline-none" />
+            <DateInput value={filterCreditExpiry.from} onChange={(v) => setFilterCreditExpiry((p) => ({ ...p, from: v }))} />
             <span className="shrink-0 text-xs text-light-grey">–</span>
-            <input type="date" value={filterCreditExpiry.to} onChange={(e) => setFilterCreditExpiry((p) => ({ ...p, to: e.target.value }))} className="h-7 w-full bg-transparent text-sm text-black outline-none" />
+            <DateInput value={filterCreditExpiry.to} onChange={(v) => setFilterCreditExpiry((p) => ({ ...p, to: v }))} />
           </div>
         </div>
 
