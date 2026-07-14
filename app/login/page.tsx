@@ -25,7 +25,6 @@ export default function LoginPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      console.log(email, password);
       await signInWithEmailAndPassword(auth, email, password);
       router.push("/dashboard");
     } catch (error) {
