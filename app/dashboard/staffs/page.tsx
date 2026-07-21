@@ -490,7 +490,7 @@ export default function StaffsPage() {
       closeCreate();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to create staff. Please try again.");
+      toast.error(err instanceof Error ? err.message : "Failed to create staff. Please try again.");
     } finally {
       setCreateLoading(false);
     }
@@ -538,7 +538,7 @@ export default function StaffsPage() {
       closeEdit();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to update user. Please try again.");
+      toast.error(err instanceof Error ? err.message : "Failed to update user. Please try again.");
     } finally {
       setEditLoading(false);
     }
@@ -552,7 +552,7 @@ export default function StaffsPage() {
       toast.success("User deleted.");
     } catch (err) {
       console.error(err);
-      toast.error("Failed to delete user.");
+      toast.error(err instanceof Error ? err.message : "Failed to delete user.");
     }
   }
 
