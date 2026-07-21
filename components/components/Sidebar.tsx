@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LogOut,
-  LayoutDashboard,
   Package,
   Store,
   Layers,
@@ -13,7 +12,6 @@ import {
   X,
   Menu,
   Settings,
-  Bell,
   Mail,
   ArrowLeftRight,
   Tag,
@@ -26,6 +24,7 @@ import { auth } from "@/app/lib/firebase";
 import { useAuth } from "@/app/lib/AuthContext";
 import { WEBAPP_VERSION } from "@/app/utils/constant";
 import { useState } from "react";
+import { Button } from "../ui/button";
 
 const navItems = [
   // { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: true },
@@ -84,15 +83,16 @@ export function Sidebar() {
         })}
       </nav>
       <div className="mt-auto border-t border-border p-3">
-      <button
+      <Button
+        variant="outline"
+        className="w-full"
           onClick={handleLogout}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-black transition-colors hover:bg-soft-grey hover:text-white"
         >
           <LogOut size={15} />
           Logout
-        </button>
+        </Button>
         {user?.email && (
-          <p className="mb-1 px-3 text-xs  truncate">{user.email}</p>
+          <p className="mb-1 mt-1 px-3 text-xs  truncate">{user.email}</p>
         )}
         <p className="mt-2 px-3 text-xs">v{WEBAPP_VERSION}</p>
       </div>
@@ -181,13 +181,14 @@ export function MobileNav() {
           {user?.email && (
             <p className="mb-1 px-3 text-xs text-gray-500 truncate">{user.email}</p>
           )}
-          <button
+          <Button
+            variant="outline"
+            className="w-full"
             onClick={handleLogout}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-500 transition-colors hover:bg-red-50"
           >
             <LogOut size={15} />
             Logout
-          </button>
+          </Button>
         </div>
       </aside>
     </>

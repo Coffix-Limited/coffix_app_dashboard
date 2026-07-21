@@ -558,10 +558,11 @@ export default function StaffsPage() {
 
   // ── Utility: look up store names for display
   function storeNames(ids: string[] | undefined): string {
-    if (!ids || ids.length === 0) return "—";
-    return ids
+    if (!ids || ids.length === 0) return "N/A";
+    const names: string = ids
       .map((id) => stores.find((s) => s.docId === id)?.name ?? id)
       .join(", ");
+    return names || "N/A";
   }
 
   return (
@@ -652,11 +653,11 @@ export default function StaffsPage() {
 
                   <td className="px-5 py-3">
                     {staff.role === "admin" ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                      <span className="inline-flex items-center justify-center gap-1.5 rounded-full bg-primary/10 min-w-32 px-2.5 py-1 text-xs font-medium text-primary">
                         Admin
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-black px-2.5 py-1 text-xs font-medium text-white">
+                      <span className="inline-flex items-center justify-center gap-1.5 rounded-full bg-black min-w-32 px-2.5 py-1 text-xs font-medium text-white">
                         Store Manager
                       </span>
                     )}
