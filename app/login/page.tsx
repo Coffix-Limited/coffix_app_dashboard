@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useAuth } from "@/app/lib/AuthContext";
 import { auth } from "../lib/firebase";
+import { Button } from "@/components/ui/button";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -25,7 +26,6 @@ export default function LoginPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      console.log(email, password);
       await signInWithEmailAndPassword(auth, email, password);
       router.push("/dashboard");
     } catch (error) {
@@ -82,13 +82,13 @@ export default function LoginPage() {
               Forgot password?
             </Link>
           </div>
-          <button
+          <Button
             type="submit"
+            className="w-full"
             disabled={submitting}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {submitting ? "Signing in…" : "Sign in"}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

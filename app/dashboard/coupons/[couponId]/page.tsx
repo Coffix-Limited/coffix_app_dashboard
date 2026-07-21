@@ -168,6 +168,7 @@ export default function CouponDetailPage() {
             title="Metadata"
             rows={[
               { label: "Doc ID", value: coupon.docId ?? "—", mono: true },
+              { label: "Email", value: coupon.customerEmail ?? "—" },
               { label: "Created At", value: formatDateTime(coupon.createdAt) },
               { label: "Notes", value: coupon.notes ?? "—" },
             ]}

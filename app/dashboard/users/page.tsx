@@ -495,19 +495,23 @@ export default function UsersPage() {
     }
     setCreditLoading(true);
     try {
-      await Promise.all(
-        Array.from(selectedIds).map((docId) => {
-          const user = users.find((u) => u.docId === docId);
-          const newCredit = (user?.creditAvailable ?? 0) + amount;
-          return UserService.updateUser(docId, { creditAvailable: newCredit });
-        })
-      );
+      const res = await fetch("/api/credit/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userIds: Array.from(selectedIds), amount }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error ?? data?.message ?? `Error ${res.status}`);
+      }
       toast.success(`Added $${amount.toFixed(2)} credits to ${selectedIds.size} user(s).`);
       setShowAddCredits(false);
       setCreditAmount("");
       clearSelection();
-    } catch {
-      toast.error("Failed to add credits. Please try again.");
+    } catch (err) {
+      toast.error("Failed to add credits.", {
+        description: err instanceof Error ? err.message : "Something went wrong.",
+      });
     } finally {
       setCreditLoading(false);
     }

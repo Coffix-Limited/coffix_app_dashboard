@@ -32,10 +32,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (firebaseUser) {
         setStaffLoading(true);
-        staffUnsubRef.current = onSnapshot(doc(db, "staffs", firebaseUser.uid), (snap) => {
-          setCurrentStaff(snap.exists() ? ({ ...snap.data(), docId: snap.id } as Staff) : null);
-          setStaffLoading(false);
-        });
+        staffUnsubRef.current = onSnapshot(
+          doc(db, "staffs", firebaseUser.uid),
+          (snap) => {
+            setCurrentStaff(snap.exists() ? ({ ...snap.data(), docId: snap.id } as Staff) : null);
+            setStaffLoading(false);
+          },
+          (error) => {
+            console.error("Failed to load staff record:", error);
+            setCurrentStaff(null);
+            setStaffLoading(false);
+          }
+        );
       } else {
         setCurrentStaff(null);
         setStaffLoading(false);
