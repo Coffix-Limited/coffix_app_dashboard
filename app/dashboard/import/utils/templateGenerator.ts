@@ -1,23 +1,29 @@
-import { CollectionKey } from "./csvParser";
+import { schemas, CollectionKey, COLLECTION_KEYS } from "./importSchemas";
 
-const TEMPLATES: Record<CollectionKey, string[]> = {
-  products: ["docId", "name", "price", "cost", "categoryId", "modifierGroupIds", "availableToStores", "disabledStores", "order", "imageUrl"],
-  productCategories: ["docId", "name", "order"],
-  modifiers: ["docId", "label", "groupId", "isDefault", "priceDelta", "cost"],
-  modifierGroups: ["docId", "name", "required", "modifierIds"],
-  coupons: ["docId", "code", "type", "amount", "expiryDate", "storeId", "usageLimit", "notes", "source"],
-};
-
-export const COLLECTION_LABELS: Record<CollectionKey, string> = {
-  products: "Products",
+/** Human-friendly labels; falls back to a title-cased key for anything not listed. */
+const LABEL_OVERRIDES: Partial<Record<CollectionKey, string>> = {
   productCategories: "Categories",
-  modifiers: "Modifiers",
   modifierGroups: "Modifier Groups",
-  coupons: "Coupons",
 };
+
+function titleCase(key: string): string {
+  const spaced = key.replace(/([a-z])([A-Z])/g, "$1 $2");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+export const COLLECTION_LABELS = Object.fromEntries(
+  COLLECTION_KEYS.map((key) => [key, LABEL_OVERRIDES[key] ?? titleCase(key)]),
+) as Record<CollectionKey, string>;
+
+/** Column headers for a collection: docId first, then every non-system field. */
+export function templateHeaders(collection: CollectionKey): string[] {
+  const fields = schemas[collection].fields;
+  const keys = Object.keys(fields).filter((k) => !fields[k].system);
+  return ["docId", ...keys];
+}
 
 export function generateTemplate(collection: CollectionKey): void {
-  const headers = TEMPLATES[collection];
+  const headers = templateHeaders(collection);
   const csv = headers.join(",") + "\n";
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);

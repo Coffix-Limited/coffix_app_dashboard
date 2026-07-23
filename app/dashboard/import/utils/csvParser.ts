@@ -1,11 +1,7 @@
 import Papa from "papaparse";
+import { schemas, CollectionKey, FieldSpec } from "./importSchemas";
 
-export type CollectionKey =
-  | "products"
-  | "productCategories"
-  | "modifiers"
-  | "modifierGroups"
-  | "coupons";
+export type { CollectionKey } from "./importSchemas";
 
 export interface RowError {
   row: number;
@@ -17,64 +13,11 @@ export interface ParseResult<T> {
   updates: T[];
   errors: RowError[];
   fileError?: string;
+  /** Columns present in the CSV that are not in the schema and were dropped. */
+  droppedColumns: string[];
 }
 
-const FORBIDDEN_FIELDS = [
-  "createdAt",
-  "updatedAt",
-  "usageCount",
-  "isUsed",
-  "userIds",
-  "fcmToken",
-  "appVersion",
-];
-
-const FIELD_CONFIG: Record<
-  CollectionKey,
-  {
-    required: string[];
-    numbers: string[];
-    booleans: string[];
-    dates: string[];
-    pipes: string[];
-  }
-> = {
-  products: {
-    required: ["name", "price"],
-    numbers: ["price", "cost", "order"],
-    booleans: [],
-    dates: [],
-    pipes: ["modifierGroupIds", "availableToStores", "disabledStores"],
-  },
-  productCategories: {
-    required: ["name"],
-    numbers: [],
-    booleans: [],
-    dates: [],
-    pipes: [],
-  },
-  modifiers: {
-    required: ["label"],
-    numbers: ["priceDelta", "cost"],
-    booleans: ["isDefault"],
-    dates: [],
-    pipes: [],
-  },
-  modifierGroups: {
-    required: ["name"],
-    numbers: [],
-    booleans: ["required"],
-    dates: [],
-    pipes: ["modifierIds"],
-  },
-  coupons: {
-    required: ["code"],
-    numbers: ["amount", "usageLimit"],
-    booleans: [],
-    dates: ["expiryDate"],
-    pipes: [],
-  },
-};
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function parseBool(val: string): boolean | null {
   const v = val.trim().toLowerCase();
@@ -88,6 +31,57 @@ function parseDate(val: string): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+/** Assign a value into a nested object following a dotted path ("a.b.c"). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function setNested(target: Record<string, any>, path: string, value: any): void {
+  const parts = path.split(".");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let node: Record<string, any> = target;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const key = parts[i];
+    if (typeof node[key] !== "object" || node[key] === null) {
+      node[key] = {};
+    }
+    node = node[key];
+  }
+  node[parts[parts.length - 1]] = value;
+}
+
+/**
+ * Coerce/validate a single non-empty value against its field spec.
+ * Returns either the coerced value or an error message.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function coerce(key: string, val: string, spec: FieldSpec): { value: any } | { error: string } {
+  switch (spec.type) {
+    case "number": {
+      const n = parseFloat(val);
+      if (isNaN(n)) return { error: `"${key}" must be a number (got "${val}")` };
+      return { value: n };
+    }
+    case "boolean": {
+      const b = parseBool(val);
+      if (b === null) return { error: `"${key}" must be true or false (got "${val}")` };
+      return { value: b };
+    }
+    case "timestamp": {
+      const d = parseDate(val);
+      if (!d) return { error: `"${key}" must be an ISO 8601 date (got "${val}")` };
+      return { value: d };
+    }
+    case "email": {
+      if (!EMAIL_RE.test(val.trim())) return { error: `"${key}" must be a valid email (got "${val}")` };
+      return { value: val.trim() };
+    }
+    case "array": {
+      return { value: val.split("|").map((s) => s.trim()).filter(Boolean) };
+    }
+    case "string":
+    default:
+      return { value: val };
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function parseCSV<T extends Record<string, any>>(
   csvText: string,
@@ -99,21 +93,23 @@ export function parseCSV<T extends Record<string, any>>(
   });
 
   if (!result.data.length) {
-    return { creates: [], updates: [], errors: [], fileError: "CSV file is empty or has no data rows." };
-  }
-
-  const headers = Object.keys(result.data[0]);
-  const forbidden = headers.filter((h) => FORBIDDEN_FIELDS.includes(h));
-  if (forbidden.length) {
     return {
       creates: [],
       updates: [],
       errors: [],
-      fileError: `CSV contains forbidden system field(s): ${forbidden.join(", ")}. Remove these columns and re-upload.`,
+      droppedColumns: [],
+      fileError: "CSV file is empty or has no data rows.",
     };
   }
 
-  const config = FIELD_CONFIG[collection];
+  const fields = schemas[collection].fields;
+  const headers = Object.keys(result.data[0]);
+
+  // Any header that is neither docId nor a known field is dropped.
+  const droppedColumns = headers.filter(
+    (h) => h !== "docId" && !(h in fields),
+  );
+
   const creates: T[] = [];
   const updates: T[] = [];
   const errors: RowError[] = [];
@@ -124,43 +120,29 @@ export function parseCSV<T extends Record<string, any>>(
     const row: Record<string, any> = {};
     const rowErrors: string[] = [];
 
-    for (const [key, raw] of Object.entries(rawRow)) {
-      if (key === "docId") continue;
-      const val = raw?.trim() ?? "";
-
-      if (config.required.includes(key) && !val) {
+    // Validate required fields even when the column is absent from the CSV.
+    for (const [key, spec] of Object.entries(fields)) {
+      if (!spec.required || spec.system) continue;
+      const raw = rawRow[key];
+      if (!raw || !raw.trim()) {
         rowErrors.push(`"${key}" is required`);
+      }
+    }
+
+    for (const [key, raw] of Object.entries(rawRow)) {
+      if (key === "docId") continue; // handled as identity below
+      const spec = fields[key];
+      if (!spec || spec.system) continue; // unknown or system column → drop
+
+      const val = raw?.trim() ?? "";
+      if (!val) continue; // required-emptiness already reported above
+
+      const res = coerce(key, val, spec);
+      if ("error" in res) {
+        rowErrors.push(res.error);
         continue;
       }
-
-      if (!val) continue;
-
-      if (config.numbers.includes(key)) {
-        const n = parseFloat(val);
-        if (isNaN(n)) {
-          rowErrors.push(`"${key}" must be a number (got "${val}")`);
-          continue;
-        }
-        row[key] = n;
-      } else if (config.booleans.includes(key)) {
-        const b = parseBool(val);
-        if (b === null) {
-          rowErrors.push(`"${key}" must be true or false (got "${val}")`);
-          continue;
-        }
-        row[key] = b;
-      } else if (config.dates.includes(key)) {
-        const d = parseDate(val);
-        if (!d) {
-          rowErrors.push(`"${key}" must be ISO 8601 date (got "${val}")`);
-          continue;
-        }
-        row[key] = d;
-      } else if (config.pipes.includes(key)) {
-        row[key] = val.split("|").map((s) => s.trim()).filter(Boolean);
-      } else {
-        row[key] = val;
-      }
+      setNested(row, key, res.value);
     }
 
     if (rowErrors.length) {
@@ -176,5 +158,5 @@ export function parseCSV<T extends Record<string, any>>(
     }
   });
 
-  return { creates, updates, errors };
+  return { creates, updates, errors, droppedColumns };
 }
