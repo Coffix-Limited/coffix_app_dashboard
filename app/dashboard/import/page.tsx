@@ -2,19 +2,14 @@
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload, Download, FileText, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Upload, Download, Upload as UploadIcon, FileText, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CollectionKey, parseCSV, RowError } from "./utils/csvParser";
+import { parseCSV } from "./utils/csvParser";
+import { CollectionKey, COLLECTION_KEYS } from "./utils/importSchemas";
 import { generateTemplate, COLLECTION_LABELS } from "./utils/templateGenerator";
-import { importRecords, ImportError } from "./service/ImportService";
+import { exportCollection, importCollection, ImportError } from "./service/BackendImportService";
 
-const COLLECTIONS: CollectionKey[] = [
-  "products",
-  "productCategories",
-  "modifiers",
-  "modifierGroups",
-  "coupons",
-];
+const COLLECTIONS: CollectionKey[] = COLLECTION_KEYS;
 
 interface ImportSummary {
   created: number;
@@ -23,26 +18,26 @@ interface ImportSummary {
 }
 
 export default function ImportPage() {
-  const [collection, setCollection] = useState<CollectionKey>("products");
+  const [collection, setCollection] = useState<CollectionKey>(COLLECTIONS[0]);
   const [fileError, setFileError] = useState<string | null>(null);
-  const [rowErrors, setRowErrors] = useState<RowError[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [preview, setPreview] = useState<Record<string, any>[]>([]);
+  const [previewPage, setPreviewPage] = useState(0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [creates, setCreates] = useState<Record<string, any>[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [updates, setUpdates] = useState<Record<string, any>[]>([]);
+  const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function resetFile() {
     setFileError(null);
-    setRowErrors([]);
-    setPreview([]);
+    setPreviewPage(0);
     setCreates([]);
     setUpdates([]);
+    setFile(null);
     setFileName(null);
     setSummary(null);
     if (fileRef.current) fileRef.current.value = "";
@@ -54,10 +49,11 @@ export default function ImportPage() {
   }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const selected = e.target.files?.[0];
+    if (!selected) return;
     setSummary(null);
-    setFileName(file.name);
+    setFile(selected);
+    setFileName(selected.name);
 
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -66,29 +62,35 @@ export default function ImportPage() {
 
       if (result.fileError) {
         setFileError(result.fileError);
-        setRowErrors([]);
-        setPreview([]);
+        setPreviewPage(0);
         setCreates([]);
         setUpdates([]);
         return;
       }
 
+      if (result.creates.length === 0 && result.updates.length === 0) {
+        setFileError(
+          `No valid rows found for "${COLLECTION_LABELS[collection]}". Check that you selected the right collection and that the CSV columns match its template.`,
+        );
+        setCreates([]);
+        setUpdates([]);
+        setPreviewPage(0);
+        return;
+      }
+
       setFileError(null);
-      setRowErrors(result.errors);
       setCreates(result.creates);
       setUpdates(result.updates);
-
-      const allRows = [...result.creates, ...result.updates];
-      setPreview(allRows.slice(0, 10));
+      setPreviewPage(0);
     };
-    reader.readAsText(file);
+    reader.readAsText(selected);
   }
 
   async function handleImport() {
-    if (!creates.length && !updates.length) return;
+    if (!file || (!creates.length && !updates.length)) return;
     setImporting(true);
     try {
-      const result = await importRecords(collection, creates, updates);
+      const result = await importCollection(collection, file);
       setSummary(result);
       if (result.errors.length === 0) {
         toast.success(`Import complete: ${result.created} created, ${result.updated} updated.`);
@@ -98,22 +100,42 @@ export default function ImportPage() {
       resetFile();
     } catch (err) {
       console.error(err);
-      toast.error("Import failed. Check the console for details.");
+      toast.error(err instanceof Error ? err.message : "Import failed. Check the console for details.");
     } finally {
       setImporting(false);
     }
   }
 
+  async function handleExport() {
+    setExporting(true);
+    try {
+      await exportCollection(collection);
+      toast.success(`Exported ${COLLECTION_LABELS[collection]}.`);
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Export failed. Check the console for details.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const hasData = creates.length > 0 || updates.length > 0;
-  const canImport = hasData && rowErrors.length === 0 && !fileError;
+  const canImport = hasData && !fileError && !!file;
+
+  const PREVIEW_PAGE_SIZE = 10;
+  const allPreviewRows = [...creates, ...updates];
+  const previewTotal = allPreviewRows.length;
+  const previewPageCount = Math.ceil(previewTotal / PREVIEW_PAGE_SIZE);
+  const previewStart = previewPage * PREVIEW_PAGE_SIZE;
+  const preview = allPreviewRows.slice(previewStart, previewStart + PREVIEW_PAGE_SIZE);
   const previewHeaders = preview.length ? Object.keys(preview[0]) : [];
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Bulk Import</h1>
+        <h1 className="text-2xl font-semibold">Bulk Import & Export</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Upload a CSV to create or update records. Leave <code className="bg-gray-100 px-1 rounded">docId</code> blank to create; fill it in to update.
+          Upload a CSV to create or update records. Leave <code className="bg-gray-100 px-1 rounded">docId</code> blank to create; fill it in to update. Importing and exporting run on the backend.
         </p>
       </div>
 
@@ -135,8 +157,8 @@ export default function ImportPage() {
         </div>
       </div>
 
-      {/* Template download */}
-      <div className="flex items-center gap-3">
+      {/* Template + export actions */}
+      <div className="flex flex-wrap items-center gap-3">
         <Button
           variant="outline"
           size="sm"
@@ -145,7 +167,16 @@ export default function ImportPage() {
           <Download size={14} className="mr-1.5" />
           Download {COLLECTION_LABELS[collection]} Template
         </Button>
-        <span className="text-xs text-gray-400">Get the blank CSV with the correct column headers.</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExport}
+          disabled={exporting}
+        >
+          <UploadIcon size={14} className="mr-1.5 rotate-180" />
+          {exporting ? "Exporting…" : `Export ${COLLECTION_LABELS[collection]}`}
+        </Button>
+        <span className="text-xs text-gray-400">Template gives blank headers; Export downloads current data.</span>
       </div>
 
       {/* File upload */}
@@ -155,10 +186,10 @@ export default function ImportPage() {
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
-          const file = e.dataTransfer.files?.[0];
-          if (file && fileRef.current) {
+          const dropped = e.dataTransfer.files?.[0];
+          if (dropped && fileRef.current) {
             const dt = new DataTransfer();
-            dt.items.add(file);
+            dt.items.add(dropped);
             fileRef.current.files = dt.files;
             fileRef.current.dispatchEvent(new Event("change", { bubbles: true }));
           }
@@ -192,34 +223,19 @@ export default function ImportPage() {
         </div>
       )}
 
-      {/* Row-level errors */}
-      {rowErrors.length > 0 && (
-        <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 space-y-1">
-          <p className="text-sm font-medium text-yellow-800 flex items-center gap-1.5">
-            <AlertCircle size={14} />
-            {rowErrors.length} row(s) have validation errors and will be skipped:
-          </p>
-          <ul className="text-xs text-yellow-700 list-disc list-inside space-y-0.5 max-h-40 overflow-y-auto">
-            {rowErrors.map((e) => (
-              <li key={e.row}>
-                Row {e.row}: {e.message}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       {/* Preview table */}
       {preview.length > 0 && (
         <div className="space-y-2">
           <p className="text-sm font-medium">
-            Preview ({creates.length} to create, {updates.length} to update
-            {rowErrors.length > 0 ? `, ${rowErrors.length} skipped` : ""})
+            Preview ({creates.length} to create, {updates.length} to update)
           </p>
           <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-xs">
               <thead className="bg-gray-50 border-b border-border">
                 <tr>
+                  <th className="px-3 py-2 text-right font-medium text-gray-400 whitespace-nowrap w-10">
+                    #
+                  </th>
                   {previewHeaders.map((h) => (
                     <th key={h} className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
                       {h}
@@ -230,19 +246,49 @@ export default function ImportPage() {
               <tbody className="divide-y divide-border">
                 {preview.map((row, i) => (
                   <tr key={i} className="hover:bg-gray-50">
+                    <td className="px-3 py-2 text-right text-gray-400 tabular-nums whitespace-nowrap">
+                      {previewStart + i + 1}
+                    </td>
                     {previewHeaders.map((h) => (
                       <td key={h} className="px-3 py-2 text-gray-700 whitespace-nowrap max-w-[200px] truncate">
-                        {Array.isArray(row[h]) ? row[h].join(" | ") : String(row[h] ?? "")}
+                        {formatCell(row[h])}
                       </td>
                     ))}
                   </tr>
                 ))}
               </tbody>
             </table>
-            {creates.length + updates.length > 10 && (
-              <p className="px-3 py-2 text-xs text-gray-400 border-t border-border">
-                Showing first 10 of {creates.length + updates.length} rows.
-              </p>
+            {previewTotal > PREVIEW_PAGE_SIZE && (
+              <div className="flex items-center justify-between px-3 py-2 border-t border-border">
+                <p className="text-xs text-gray-400">
+                  Showing {previewStart + 1}–{previewStart + preview.length} of {previewTotal} rows.
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={() => setPreviewPage((p) => Math.max(0, p - 1))}
+                    disabled={previewPage === 0}
+                    aria-label="Previous rows"
+                  >
+                    <ChevronLeft size={14} />
+                  </Button>
+                  <span className="text-xs text-gray-500 tabular-nums px-1">
+                    {previewPage + 1} / {previewPageCount}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={() => setPreviewPage((p) => Math.min(previewPageCount - 1, p + 1))}
+                    disabled={previewPage >= previewPageCount - 1}
+                    aria-label="Next rows"
+                  >
+                    <ChevronRight size={14} />
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -260,11 +306,6 @@ export default function ImportPage() {
           <Button variant="outline" onClick={resetFile} disabled={importing}>
             Clear
           </Button>
-          {rowErrors.length > 0 && (
-            <span className="text-xs text-yellow-600">
-              {rowErrors.length} row(s) will be skipped due to errors.
-            </span>
-          )}
         </div>
       )}
 
@@ -286,7 +327,7 @@ export default function ImportPage() {
             <ul className="text-xs text-red-600 list-disc list-inside max-h-32 overflow-y-auto">
               {summary.errors.map((e, i) => (
                 <li key={i}>
-                  {e.docId}: {e.message}
+                  {e.docId ?? (e.row != null ? `Row ${e.row}` : "Error")}: {e.message}
                 </li>
               ))}
             </ul>
@@ -295,4 +336,12 @@ export default function ImportPage() {
       )}
     </div>
   );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function formatCell(value: any): string {
+  if (Array.isArray(value)) return value.join(" | ");
+  if (value instanceof Date) return value.toISOString();
+  if (value && typeof value === "object") return JSON.stringify(value);
+  return String(value ?? "");
 }
